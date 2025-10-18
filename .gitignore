@@ -7,5 +7,7 @@ hs_err_pid*
 .vscode
 .metals
 
-distributedSorting/target
-distributedSorting/.bloop
+distributed-sorting/target
+distributed-sorting/.bsp
+distributed-sorting/project/project
+distributed-sorting/project/target
