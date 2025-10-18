@@ -31,6 +31,7 @@ gRPC
 
 https://scalapb.github.io/docs/installation
 
+
 - 다음 회의
     - 주제: branch 생성 및 basic design
     - 일시: 10/25(토) - 13:00 ~
