@@ -6,6 +6,7 @@ hs_err_pid*
 
 .vscode
 .metals
+.DS_Store
 
 distributed-sorting/target
 distributed-sorting/.bsp
