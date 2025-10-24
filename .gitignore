@@ -11,3 +11,6 @@ distributed-sorting/target
 distributed-sorting/.bsp
 distributed-sorting/project/project
 distributed-sorting/project/target
+distributed-sorting/.bloop
+distributed-sorting/project/.bloop
+distributed-sorting/project/metals.sbt
