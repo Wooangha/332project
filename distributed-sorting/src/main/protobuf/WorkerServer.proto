@@ -12,9 +12,13 @@ message PartitionData {
   bytes data = 1;
 }
 
+message IsAliveReply {
+  bool isAlive = 1;
+}
+
 service WorkerSever {
   // TODO: is it rpc?
   // rpc setPartitionDone (google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc getPartitionData (Ip) returns (stream PartitionData);
-  rpc isAlive(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc isAlive(google.protobuf.Empty) returns (IsAliveReply);
 }
