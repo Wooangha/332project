@@ -40,6 +40,6 @@ message CanShutdownWorkerServerReply {
 service MasterServer {
   rpc register (WorkerInfo) returns (RegisterReply);
   rpc getPartitionRange (SampleKeyData) returns (PartitionRanges);
-  rpc getUpdatedWorkerInfo (google.protobuf.Empty) returns (WorkerInfo);
+  rpc getUpdatedWorkerInfo (Version) returns (WorkerInfo);
   rpc canShutdownWorkerServer (google.protobuf.Empty) returns (CanShutdownWorkerServerReply);
 }
