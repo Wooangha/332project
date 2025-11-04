@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package com.worker.server;
+
+import "google/protobuf/empty.proto";
+
+message Ip {
+  string ip = 1;
+}
+
+message PartitionData {
+  bytes data = 1;
+}
+
+message IsAliveReply {
+  bool isAlive = 1;
+}
+
+service WorkerSever {
+  // TODO: is it rpc?
+  // rpc setPartitionDone (google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc getPartitionData (Ip) returns (stream PartitionData);
+  rpc isAlive(google.protobuf.Empty) returns (IsAliveReply);
+}

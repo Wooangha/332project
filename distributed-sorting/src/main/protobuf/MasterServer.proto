@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package com.master.server;
+
+import "google/protobuf/empty.proto";
+
+message WorkerInfo {
+  string ip = 1;
+  uint32 port = 2;
+}
+message Version {
+  uint32 version = 1;
+}
+
+message RegisterReply {
+  repeated WorkerInfo workerInfos = 1;
+  Version version = 2;
+}
+
+message SampleKeyData {
+  message Key {
+    string keyDatum = 1;
+  }
+  repeated Key keyData = 1;
+}
+
+message PartitionRanges {
+  // [startKey, endKey) === (startKey <= key < endKey)
+  message PartitionRange {
+    string startKey = 1;
+    string endKey = 2;
+  }
+  repeated PartitionRange PartitionRanges = 1;
+}
+
+message CanShutdownWorkerServerReply {
+  bool canShutdownWorkerServer = 1;
+}
+
+service MasterServer {
+  rpc register (WorkerInfo) returns (RegisterReply);
+  rpc getPartitionRange (SampleKeyData) returns (PartitionRanges);
+  rpc getUpdatedWorkerInfo (Version) returns (WorkerInfo);
+  rpc canShutdownWorkerServer (google.protobuf.Empty) returns (CanShutdownWorkerServerReply);
+}
