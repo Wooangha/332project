@@ -22,7 +22,8 @@ class MasterServerImpl extends MasterServer {
     def register(request: WorkerInfo): Future[RegisterReply] = {
         val ip = request.ip
         val port = request.port
-
+        
+        // lock.synchronized 아직 미구현, 추후 lock.synchronized로 묶는다면 map 업데이트 부터 버전 비교 까지를 묶어야 할 듯?
         workerInfosMap += (ip -> port)
 
         val newVersion = currentVersion.incrementAndGet()
