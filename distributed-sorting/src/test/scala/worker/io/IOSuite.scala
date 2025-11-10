@@ -1,7 +1,8 @@
 package worker.io
 
-import org.scalatest.funsuite.AnyFunSuite
 import java.nio.file.{Paths, Files}
+
+import org.scalatest.funsuite.AnyFunSuite
 
 class IOSuite extends AnyFunSuite {
   

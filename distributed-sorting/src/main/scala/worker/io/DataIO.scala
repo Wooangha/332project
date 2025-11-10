@@ -1,6 +1,5 @@
 package worker.io
 
-import scala.io.Source
 import java.nio.file.{Paths, Files, Path}
 import java.io.RandomAccessFile
 
