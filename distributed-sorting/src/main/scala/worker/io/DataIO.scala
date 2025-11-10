@@ -10,14 +10,14 @@ object DataParse {
       Datum(Key(key.toVector), Value(value.toVector))
     }.toList
   }
-  def data2Map(data: List[Datum]) = data.map(_.toTuple).toMap
+  def data2Map(data: Seq[Datum]) = data.map(_.toTuple).toMap
   def getMap(s: Seq[Byte]): Map[Key, Value] = {
     s.sliding(100, 100).map(_.splitAt(10)).map { case (key, value) =>
       (Key(key.toVector), Value(value.toVector))
     }.toMap
   }
   
-  def unparse(data: List[Datum]): Vector[Byte] = {
+  def unparse(data: Seq[Datum]): Vector[Byte] = {
     def unparseDatum(datum: Datum): Vector[Byte] = datum match {
       case Datum(Key(key), Value(value)) => key ++ value
     }
@@ -27,12 +27,13 @@ object DataParse {
   }
 }
 
-trait DataReader {
+trait FileReader[T] {
   val inputDir: String
+  def parse(bytes: Array[Byte]): List[T]
 
-  lazy val data: List[Datum] = {
+  lazy val data: List[T] = {
     val bytes = Files.readAllBytes(Paths.get(inputDir))
-    DataParse.getList(bytes)
+    parse(bytes)
   }
 }
 
@@ -83,16 +84,29 @@ trait FileIterator[T] extends Iterator[T] with AutoCloseable {
   override def close(): Unit = raf.close()
 }
 
+
+trait FileWriter[T] {
+  val outputDir: String
+  val data: Seq[T]
+  def unparse(data: Seq[T]): Array[Byte]
+
+  def write(): Unit = {
+    val path = Paths.get(outputDir)
+    Files.createDirectories(path.getParent)
+    Files.write(path, unparse(data))
+  }
+}
+
+
+class DatumFileReader(val inputDir: String) extends FileReader[Datum] {
+  override def parse(bytes: Array[Byte]): List[Datum] = DataParse.getList(bytes.toSeq)
+}
+
+class DatumFileWriter(val outputDir: String, val data: Seq[Datum]) extends FileWriter[Datum] {
+  override def unparse(data: Seq[Datum]): Array[Byte] = DataParse.unparse(data).toArray
+}
+
 class DatumFileIterator(val inputDir: String) extends FileIterator[Datum] {
   override val stepSize: Int = 100
   override def parse(buf: Array[Byte]): Datum = DataParse.getList(buf).head
-}
-
-trait DataWriter {
-  val outputDir: String
-  val data: List[Datum]
-
-  def write(): Unit = {
-    Files.write(Paths.get(outputDir), DataParse.unparse(data).toArray)
-  }
 }
