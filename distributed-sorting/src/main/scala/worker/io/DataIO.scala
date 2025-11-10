@@ -36,50 +36,56 @@ trait DataReader {
   }
 }
 
-trait DatumFileIterator extends Iterator[Datum] with AutoCloseable {
+trait FileIterator[T] extends Iterator[T] with AutoCloseable {
   val inputDir: String
-  val STEP_SIZE: Int = 100
+  val stepSize: Int
+  def parse(buf: Array[Byte]): T
 
   private[this] var start: Long = 0L
   private[this] lazy val raf = new RandomAccessFile(inputDir, "r")
-  private[this] var nextDatum: Option[Datum] = None
+  private[this] var nextValue: Option[T] = None
 
   private[this] def loadNext(): Unit = {
     val remaining = raf.length() - start
-    if (remaining < STEP_SIZE) {
-      nextDatum = None
+    if (remaining < stepSize) {
+      nextValue = None
     } else {
-      val buf = new Array[Byte](STEP_SIZE)
+      val buf = new Array[Byte](stepSize)
 
       raf.seek(start)
       val actuallyRead = raf.read(buf)
       start += actuallyRead
 
       if (actuallyRead > 0) {
-        nextDatum = Some(DataParse.getList(buf).head)
+        nextValue = Some(parse(buf))
       } else {
-        nextDatum = None
+        nextValue = None
       }
     }
   }
 
   override def hasNext: Boolean = {
-    if (nextDatum.isEmpty) {
+    if (nextValue.isEmpty) {
       loadNext()
     }
-    nextDatum.nonEmpty
+    nextValue.nonEmpty
   }
 
-  override def next(): Datum = {
-    if (nextDatum.isEmpty) {
+  override def next(): T = {
+    if (nextValue.isEmpty) {
       loadNext()
     }
-    val res = nextDatum.getOrElse(throw new NoSuchElementException("no more data"))
-    nextDatum = None
+    val res = nextValue.getOrElse(throw new NoSuchElementException("no more data"))
+    nextValue = None
     res
   }
 
   override def close(): Unit = raf.close()
+}
+
+class DatumFileIterator(val inputDir: String) extends FileIterator[Datum] {
+  override val stepSize: Int = 100
+  override def parse(buf: Array[Byte]): Datum = DataParse.getList(buf).head
 }
 
 trait DataWriter {
