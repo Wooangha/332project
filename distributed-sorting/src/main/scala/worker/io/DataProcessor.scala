@@ -7,6 +7,14 @@ import scala.collection.mutable
 object  DataProcessor {
   type Ip = String
 
+  def sampling(data: List[Datum], sampleSize: Int): List[Key] = {
+    val step = Math.max(1, data.length / sampleSize)
+    for {
+      (datum, idx) <- data.zipWithIndex
+      if idx % step == 0
+    } yield datum.key
+  }
+
   def partitioning(data: List[Datum], partition: Key => Ip): Map[Ip, List[Datum]] = {
     data.groupBy(datum => partition(datum.key))
   }
