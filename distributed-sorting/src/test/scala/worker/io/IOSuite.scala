@@ -10,15 +10,13 @@ class IOSuite extends AnyFunSuite {
     val inputDir = "src/test/resources/ascii_data"
     val outputDir = "src/test/resources/output/ascii_out"
     
-    val firstReader = new DatumFileReader(inputDir)
-    val data = firstReader.data
+    val data = Data.fromFile(inputDir)
 
-    val writer = new DatumFileWriter(outputDir, data)
-    writer.write()
+    data.save(outputDir)
 
     assert {
-      val newReader = new DatumFileReader(outputDir)
-      newReader.data === data
+      val newData = Data.fromFile(outputDir)
+      newData === data
     }
   }
 
@@ -26,15 +24,13 @@ class IOSuite extends AnyFunSuite {
     val inputDir = "src/test/resources/bin_data"
     val outputDir = "src/test/resources/output/bin_out"
     
-    val firstReader = new DatumFileReader(inputDir)
-    val data = firstReader.data
+    val data = Data.fromFile(inputDir)
 
-    val writer = new DatumFileWriter(outputDir, data)
-    writer.write()
+    data.save(outputDir)
 
     assert {
-      val newReader = new DatumFileReader(outputDir)
-      newReader.data === data
+      val newData = Data.fromFile(outputDir)
+      newData === data
     }
   }
 }
@@ -46,20 +42,20 @@ class SortSuite extends AnyFunSuite {
     val inputSortedDir = "src/test/resources/sorted_ascii_data"
     val outputDir = "src/test/resources/output/sorted_out"
 
-    val reader = new DatumFileReader(inputDir)
-    val data = reader.data
+    val data = Data.fromFile(inputDir)
 
-    val sortedData = DataProcessor.sort(data)
+    val sortedData = data.sort()
 
-    new DatumFileWriter(outputDir, sortedData).write()
-    val newReader = new DatumFileReader(outputDir)
-    val newData = newReader.data
-    new DatumFileReader(inputSortedDir).data.zip(newData).foreach { case (expected, actual) => 
+    sortedData.save(outputDir)
+    val newData = Data.fromFile(outputDir)
+
+    val answerData = Data.fromFile(inputSortedDir)
+    answerData.data.zip(newData.data).foreach { case (expected, actual) => 
       assert(expected.key === actual.key && expected.value === actual.value)
     }
 
     assert {
-      newData.length === (new DatumFileReader(inputSortedDir).data.length)
+      newData.data.length === (answerData.data.length)
     }
   }
 }
@@ -69,16 +65,16 @@ class ReaderIteratorSuite extends AnyFunSuite {
   test("DatumFileIterator should read all data correctly from a file.") {
     val inputDir = "src/test/resources/bin_data"
     val readerIterator = new DatumFileIterator(inputDir)
-    val reader = new DatumFileReader(inputDir)
+    val data = Data.fromFile(inputDir)
 
     var iterCount = 0
 
-    reader.data.zip(readerIterator).foreach { case (dataFromReader, dataFromIterator) =>
+    data.data.zip(readerIterator).foreach { case (dataFromReader, dataFromIterator) =>
       iterCount += 1
       assert {
         dataFromIterator.key === dataFromReader.key && dataFromIterator.value === dataFromReader.value
       }
     }
-    assert(iterCount === reader.data.length)
+    assert(iterCount === data.data.length)
   }
 }

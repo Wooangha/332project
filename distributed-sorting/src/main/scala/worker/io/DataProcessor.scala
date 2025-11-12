@@ -5,23 +5,7 @@ import java.nio.file.{Paths, Files}
 import scala.collection.mutable
 
 object  DataProcessor {
-  type Ip = String
-
-  def sampling(data: List[Datum], sampleSize: Int): List[Key] = {
-    val step = Math.max(1, data.length / sampleSize)
-    for {
-      (datum, idx) <- data.zipWithIndex
-      if idx % step == 0
-    } yield datum.key
-  }
-
-  def partitioning(data: List[Datum], partition: Key => Ip): Map[Ip, List[Datum]] = {
-    data.groupBy(datum => partition(datum.key))
-  }
-
-  def sort(data: List[Datum]): List[Datum] = data.sortBy(_.key)
-
-
+  
   def merge(dataDirLs: List[String], makeNewDir: () => String, maxSize: Int): Unit = {
     val dataIters = dataDirLs.map(dir => new DatumFileIterator(dir))
 

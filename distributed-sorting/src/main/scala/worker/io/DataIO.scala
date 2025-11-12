@@ -2,44 +2,23 @@ package worker.io
 
 import java.nio.file.{Paths, Files, Path}
 import java.io.RandomAccessFile
+import worker.io.DatumParser.parse
 
-object DataParse {
-  def getList(s: Seq[Byte]): List[Datum] = {
-    s.sliding(100, 100).map(_.splitAt(10)).map { case (key, value) =>
-      Datum(Key(key.toVector), Value(value.toVector))
-    }.toList
-  }
-  def data2Map(data: Seq[Datum]) = data.map(_.toTuple).toMap
-  def getMap(s: Seq[Byte]): Map[Key, Value] = {
-    s.sliding(100, 100).map(_.splitAt(10)).map { case (key, value) =>
-      (Key(key.toVector), Value(value.toVector))
-    }.toMap
-  }
-  
-  def unparse(data: Seq[Datum]): Vector[Byte] = {
-    def unparseDatum(datum: Datum): Vector[Byte] = datum match {
-      case Datum(Key(key), Value(value)) => key ++ value
-    }
-    data.foldRight(Vector[Byte]()) { case (datum, accum) =>
-      unparseDatum(datum) ++ accum
-    }
-  }
-}
 
 trait FileReader[T] {
   val inputDir: String
-  def parse(bytes: Array[Byte]): List[T]
+  val parser: Parser[T]
 
-  lazy val data: List[T] = {
+  lazy val contents: Seq[T] = {
     val bytes = Files.readAllBytes(Paths.get(inputDir))
-    parse(bytes)
+    bytes.sliding(parser.dataSize, parser.dataSize).map(parser.parse(_)).toSeq
   }
 }
 
+
 trait FileIterator[T] extends Iterator[T] with AutoCloseable {
   val inputDir: String
-  val stepSize: Int
-  def parse(buf: Array[Byte]): T
+  val parser: Parser[T]
 
   private[this] var start: Long = 0L
   private[this] lazy val raf = new RandomAccessFile(inputDir, "r")
@@ -47,17 +26,17 @@ trait FileIterator[T] extends Iterator[T] with AutoCloseable {
 
   private[this] def loadNext(): Unit = {
     val remaining = raf.length() - start
-    if (remaining < stepSize) {
+    if (remaining < parser.dataSize) {
       nextValue = None
     } else {
-      val buf = new Array[Byte](stepSize)
+      val buf = new Array[Byte](parser.dataSize)
 
       raf.seek(start)
       val actuallyRead = raf.read(buf)
       start += actuallyRead
 
       if (actuallyRead > 0) {
-        nextValue = Some(parse(buf))
+        nextValue = Some(parser.parse(buf))
       } else {
         nextValue = None
       }
@@ -87,25 +66,28 @@ trait FileIterator[T] extends Iterator[T] with AutoCloseable {
 trait FileWriter[T] {
   val outputDir: String
   val data: Seq[T]
-  def unparse(data: Seq[T]): Array[Byte]
+  val parser: Parser[T]
 
   def write(): Unit = {
     val path = Paths.get(outputDir)
     Files.createDirectories(path.getParent)
-    Files.write(path, unparse(data))
+    val bytes = data.foldRight(Vector[Byte]()){ (content, accum) => 
+      parser.unparse(content).toVector ++ accum
+    }.toArray
+    Files.write(path, bytes)
   }
 }
 
 
 class DatumFileReader(val inputDir: String) extends FileReader[Datum] {
-  override def parse(bytes: Array[Byte]): List[Datum] = DataParse.getList(bytes.toSeq)
+  override val parser: Parser[Datum] = DatumParser
 }
 
 class DatumFileWriter(val outputDir: String, val data: Seq[Datum]) extends FileWriter[Datum] {
-  override def unparse(data: Seq[Datum]): Array[Byte] = DataParse.unparse(data).toArray
+  override val parser: Parser[Datum] = DatumParser
 }
 
 class DatumFileIterator(val inputDir: String) extends FileIterator[Datum] {
-  override val stepSize: Int = 100
-  override def parse(buf: Array[Byte]): Datum = DataParse.getList(buf).head
+
+  override val parser: Parser[Datum] = DatumParser
 }
