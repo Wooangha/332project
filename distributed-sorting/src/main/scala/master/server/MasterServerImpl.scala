@@ -26,11 +26,9 @@ class MasterServerImpl extends MasterServer {
         val port = request.port
         
         // lock.synchronized 아직 미구현, 추후 lock.synchronized로 묶는다면 map 업데이트 부터 버전 비교 까지를 묶어야 할 듯?
-        val prevOpt = workerInfosMap.put(ip, port)
+        workerInfosMap += (ip -> port)
 
-        val isNewWorker = prevOpt.isEmpty // 전에 등록된 적 없던 ip일 경우에만 true
-
-        val newVersion = if(isNewWorker) currentVersion.incrementAndGet() else currentVersion.get()
+        val newVersion = currentVersion.incrementAndGet()
 
         def makeReply(replyVersion: Int): RegisterReply = {
             val snap = workerInfosMap.readOnlySnapshot()
@@ -39,7 +37,7 @@ class MasterServerImpl extends MasterServer {
             RegisterReply(workerInfos = workerList, version = Some(Version(version = replyVersion)))
         }
 
-        if(newVersion < NUM_OF_WORKERS){
+        if(workerInfosMap.size < NUM_OF_WORKERS){
             val p = Promise[RegisterReply]()
             waitingRequestsForRegister.synchronized{
                 waitingRequestsForRegister += p
