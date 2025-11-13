@@ -3,11 +3,10 @@ import io.grpc.netty.NettyServerBuilder
 import scala.concurrent.{ExecutionContext}
 import scala.concurrent.ExecutionContextExecutor
 
-
 object MasterMain extends App {
     implicit val ec:ExecutionContext = ExecutionContext.global
 
-    private val port = 50051
+    private val port = 50054
 
     val server = NettyServerBuilder
     .forPort(port)
@@ -16,9 +15,12 @@ object MasterMain extends App {
 
     println(s"[Master] Server Started on port: $port")
 
+    /*
     sys.addShutdownHook{
         println("[Master] Server Shutdown...")
         server.shutdown()
     }
+    */
 
+    server.awaitTermination()
 }

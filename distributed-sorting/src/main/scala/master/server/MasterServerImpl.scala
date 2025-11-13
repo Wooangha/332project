@@ -11,6 +11,8 @@ import scala.collection.mutable.ListBuffer // for watingRequestsForRegister
 
 
 class MasterServerImpl extends MasterServer {
+    val NUM_OF_WORKERS = 2
+
     // thread-safe하게 TrieMap으로 구현
     private val workerInfosMap: TrieMap[String, Int] = TrieMap.empty
 
@@ -35,7 +37,7 @@ class MasterServerImpl extends MasterServer {
             RegisterReply(workerInfos = workerList, version = Some(Version(version = replyVersion)))
         }
 
-        if(newVersion < 20){
+        if(newVersion < NUM_OF_WORKERS){
             val p = Promise[RegisterReply]()
             waitingRequestsForRegister.synchronized{
                 waitingRequestsForRegister += p
