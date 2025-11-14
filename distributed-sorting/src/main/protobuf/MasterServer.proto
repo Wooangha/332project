@@ -19,7 +19,7 @@ message RegisterReply {
 
 message SampleKeyData {
   message Key {
-    string keyDatum = 1;
+    bytes keyDatum = 1;
   }
   repeated Key keyData = 1;
 }
@@ -27,8 +27,8 @@ message SampleKeyData {
 message PartitionRanges {
   // [startKey, endKey) === (startKey <= key < endKey)
   message PartitionRange {
-    string startKey = 1;
-    string endKey = 2;
+    bytes startKey = 1;
+    bytes endKey = 2;
   }
   repeated PartitionRange PartitionRanges = 1;
 }
