@@ -6,7 +6,7 @@ import scala.concurrent.ExecutionContextExecutor
 object MasterMain extends App {
     implicit val ec:ExecutionContext = ExecutionContext.global
 
-    private val port = 50054
+    private val port = 50055
 
     val server = NettyServerBuilder
     .forPort(port)

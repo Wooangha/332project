@@ -13,7 +13,7 @@ object WorkerRegisterTestClient extends App {
     val portArg = args(1).toInt
 
     val channel = ManagedChannelBuilder
-    .forAddress("localhost", 50054)
+    .forAddress("localhost", 50055)
     .usePlaintext()
     .build()
 
