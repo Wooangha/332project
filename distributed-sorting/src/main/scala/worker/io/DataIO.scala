@@ -2,6 +2,9 @@ package worker.io
 
 import java.nio.file.{Paths, Files, Path}
 import java.io.RandomAccessFile
+
+import scala.concurrent.blocking
+
 import worker.io.DatumParser.parse
 
 
@@ -10,7 +13,7 @@ trait FileReader[T] {
   val parser: Parser[T]
 
   lazy val contents: Seq[T] = {
-    val bytes = Files.readAllBytes(Paths.get(inputDir))
+    val bytes = blocking { Files.readAllBytes(Paths.get(inputDir)) }
     bytes.sliding(parser.dataSize, parser.dataSize).map(parser.parse(_)).toSeq
   }
 }
@@ -74,7 +77,7 @@ trait FileWriter[T] {
     val bytes = data.foldRight(Vector[Byte]()){ (content, accum) => 
       parser.unparse(content).toVector ++ accum
     }.toArray
-    Files.write(path, bytes)
+    blocking { Files.write(path, bytes) }
   }
 }
 
