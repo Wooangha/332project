@@ -93,15 +93,12 @@ class MasterServerImpl extends MasterServer {
 
             sampleKeyMap.update(ip, keyBatch)
 
-            ////////////디버깅용 프린트 //////////////
-            println(ip)
-
             if (sampleKeyMap.size < NUM_OF_WORKERS) {
                 val p = Promise[PartitionRanges]()
                 waitingRequestsForPartitionRange += p
                 promiseOpt = Some(p)
             }
-            else {
+            else { // 웨리포 완료 후 죽었다가 살아난 워커는 다시 compute 호출하므로 비효율적임 -> 나중에 optimization할 때가 오면 수정
                 val allKeys: Vector[Key] = sampleKeyMap.values.flatten.toVector
 
                 val ranges: Seq[PartitionRanges.PartitionRange] =
