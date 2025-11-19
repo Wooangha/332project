@@ -32,7 +32,7 @@ class IOSuite extends AnyFunSuite {
 
     assert {
       val newData = Data.fromFile(outputDir)
-      newData === data
+      newData.data === data.data
     }
   }
 }
