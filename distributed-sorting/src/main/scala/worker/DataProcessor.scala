@@ -3,11 +3,12 @@ package worker
 import java.nio.file.{Paths, Files}
 
 import scala.collection.mutable
-import scala.concurrent.Future
+import scala.concurrent.{Future, Await}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import common.{Data, Datum, Key}
 import worker.io.{DatumFileIterator, DatumFileWriter}
+import org.checkerframework.checker.units.qual.A
 
 object DataProcessor {
   val tempDirPrefix = "tmpSave/"
@@ -63,6 +64,7 @@ object DataProcessor {
 
   def merge(dataDirLs: List[String], makeNewDir: () => String, maxSize: Int): Unit = {
     val dataIters = dataDirLs.map(dir => new DatumFileIterator(dir))
+    var saveFutures = List[Future[Unit]]()
 
     try {
       var size = 0
@@ -88,7 +90,8 @@ object DataProcessor {
         }
         if (size >= maxSize) {
           println(s"Writing ${savingData.size} data to disk...")
-          new DatumFileWriter(makeNewDir(), savingData.toSeq).write()
+          val savFuture = Future { new DatumFileWriter(makeNewDir(), savingData.toSeq).write() }
+          saveFutures = savFuture :: saveFutures
           savingData.clear()
           size = 0
         }
@@ -98,6 +101,10 @@ object DataProcessor {
         new DatumFileWriter(makeNewDir(), savingData.toList).write()
         savingData.clear()
       }
+
+      Await.result(
+        Future.sequence(saveFutures),
+        scala.concurrent.duration.Duration.Inf)
 
     } finally {
       dataIters.foreach(_.close())
