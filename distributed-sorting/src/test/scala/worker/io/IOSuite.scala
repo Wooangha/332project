@@ -5,8 +5,7 @@ import java.nio.file.{Paths, Files}
 import org.scalatest.funsuite.AnyFunSuite
 
 import common.Data
-import worker.{GenData, CheckSorted}
-import com.google.protobuf.compiler.PluginProtos.CodeGeneratorResponse.File
+import common.{GenData, CheckSorted}
 
 class IOSuite extends AnyFunSuite with GenData {
 
@@ -28,7 +27,7 @@ class IOSuite extends AnyFunSuite with GenData {
     Files.deleteIfExists(Paths.get(outputDir))
   }
 
-    test("DatumFileIterator should read all data correctly from a file.") {
+  test("DatumFileIterator should read all data correctly from a file.") {
     val inputDir = "src/test/resources/bin_data"
     generateData(inputDir, 10, 1000, skewed = false)
 

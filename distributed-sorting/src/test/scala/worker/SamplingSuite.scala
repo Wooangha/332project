@@ -7,6 +7,7 @@ import scala.concurrent.Await
 import org.scalatest.funsuite.AnyFunSuite
 
 import common.Data
+import common.{GenData, CheckSorted}
 import worker.DataProcessor.sampling
 
 class SamplingSuite extends AnyFunSuite with GenData with CheckSorted {

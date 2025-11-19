@@ -1,4 +1,4 @@
-package worker
+package common
 
 object Config {
   val gensortPath: String = "src/test/resources/gensort/64/gensort"

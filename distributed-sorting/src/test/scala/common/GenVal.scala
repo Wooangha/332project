@@ -1,4 +1,4 @@
-package worker
+package common
 
 import java.nio.file.{Paths, Files}
 

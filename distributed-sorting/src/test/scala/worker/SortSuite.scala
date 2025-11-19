@@ -7,6 +7,7 @@ import scala.sys.process._
 import org.scalatest.funsuite.AnyFunSuite
 
 import common.Data
+import common.{GenData, CheckSorted}
 
 class SortSuite extends AnyFunSuite with GenData with CheckSorted {
 

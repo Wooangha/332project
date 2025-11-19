@@ -7,6 +7,7 @@ import scala.concurrent.Await
 import org.scalatest.funsuite.AnyFunSuite
 
 import common.{Data, Key}
+import common.{GenData, CheckSorted}
 import worker.DataProcessor.{sortAndPartitioning, removeTempDir}
 
 class PartitioningSuite extends AnyFunSuite with GenData with CheckSorted {
