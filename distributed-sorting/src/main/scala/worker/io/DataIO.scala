@@ -88,7 +88,8 @@ trait FileWriter[T] {
       baos.write(parser.serialize(t).toArray)
     }
     Files.createDirectories(Paths.get(outputDir).getParent)
-    blocking { Files.write(Paths.get(outputDir), baos.toByteArray) }
+    val bytes = baos.toByteArray
+    blocking { Files.write(Paths.get(outputDir), bytes) }
   }
 }
 
