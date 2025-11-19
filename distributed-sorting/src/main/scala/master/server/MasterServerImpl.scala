@@ -13,7 +13,7 @@ import com.google.protobuf.ByteString
 import common.Key
 
 class MasterServerImpl extends MasterServer {
-    val NUM_OF_WORKERS = 2
+    val NUM_OF_WORKERS = 3
 
     ////// for register ////////
     // thread-safe하게 TrieMap으로 구현
