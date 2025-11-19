@@ -27,14 +27,17 @@ trait FileIterator[T] extends Iterator[T] with AutoCloseable {
 
   private[this] var start: Long = 0L
   private[this] lazy val raf = new RandomAccessFile(inputDir, "r")
+
+  private[this] lazy val fileLength: Long = raf.length()
+  private[this] val recordSize = parser.dataSize
+  private[this] var position: Long = 0L
   private[this] var nextValue: Option[T] = None
 
   private[this] def loadNext(): Unit = {
-    val remaining = raf.length() - start
-    if (remaining < parser.dataSize) {
+    if (position + recordSize > fileLength) {
       nextValue = None
     } else {
-      val buf = new Array[Byte](parser.dataSize)
+      val buf = new Array[Byte](recordSize)
 
       raf.seek(start)
       val actuallyRead = raf.read(buf)
