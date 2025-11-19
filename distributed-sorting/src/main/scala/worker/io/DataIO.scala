@@ -14,7 +14,6 @@ trait FileReader[T] {
   val parser: Parser[T]
 
   lazy val contents: Seq[T] = {
-    // val bytes = blocking { Files.readAllBytes(Paths.get(inputDir)) }
     val bytes = Files.readAllBytes(Paths.get(inputDir))
     bytes.sliding(parser.dataSize, parser.dataSize).map(parser.parse(_)).toSeq
   }
@@ -53,10 +52,6 @@ trait FileIterator[T] extends Iterator[T] with AutoCloseable {
       val buf = new Array[Byte](recordSize)
       Array.copy(chunk, chunkPosition, buf, 0, recordSize)
       chunkPosition += recordSize
-
-      // raf.seek(start)
-      // val actuallyRead = raf.read(buf)
-      // start += actuallyRead
 
       nextValue = Some(parser.parse(buf))
     }
