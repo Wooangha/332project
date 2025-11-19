@@ -18,10 +18,12 @@ message RegisterReply {
 }
 
 message SampleKeyData {
+  string ip = 1;   // 샘플 보낸 워커의 ip를 담아야 getPartitionRange에서 웨리포 풀 조건 작성 가능함
+
   message Key {
     bytes keyDatum = 1;
   }
-  repeated Key keyData = 1;
+  repeated Key keyData = 2;
 }
 
 message PartitionRanges {
