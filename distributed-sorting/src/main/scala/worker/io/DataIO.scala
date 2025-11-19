@@ -1,7 +1,7 @@
 package worker.io
 
 import java.nio.file.{Paths, Files, Path}
-import java.io.RandomAccessFile
+import java.io.{RandomAccessFile, ByteArrayOutputStream}
 
 import scala.concurrent.blocking
 
@@ -88,13 +88,12 @@ trait FileWriter[T] {
   val parser: Parser[T]
 
   def write(): Unit = {
-    val path = Paths.get(outputDir)
-    Files.createDirectories(path.getParent)
-    val bytes = data.foldRight(Vector[Byte]()){ (content, accum) => 
-      parser.serialize(content).toVector ++ accum
-    }.toArray
-    // blocking { Files.write(path, bytes) }
-    Files.write(path, bytes)
+    val baos = new ByteArrayOutputStream()
+    data.foreach { t =>
+      baos.write(parser.serialize(t).toArray)
+    }
+    Files.createDirectories(Paths.get(outputDir).getParent)
+    Files.write(Paths.get(outputDir), baos.toByteArray)
   }
 }
 
