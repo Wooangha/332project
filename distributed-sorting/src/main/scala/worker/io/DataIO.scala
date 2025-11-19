@@ -29,7 +29,7 @@ trait FileIterator[T] extends Iterator[T] with AutoCloseable {
   private[this] lazy val raf = new RandomAccessFile(inputDir, "r")
 
   private[this] lazy val fileLength: Long = raf.length()
-  private[this] val recordSize = parser.dataSize
+  private[this] lazy val recordSize = parser.dataSize
   private[this] var position: Long = 0L
   private[this] var nextValue: Option[T] = None
 
