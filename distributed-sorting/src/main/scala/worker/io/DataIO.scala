@@ -93,7 +93,7 @@ trait FileWriter[T] {
       baos.write(parser.serialize(t).toArray)
     }
     Files.createDirectories(Paths.get(outputDir).getParent)
-    Files.write(Paths.get(outputDir), baos.toByteArray)
+    blocking { Files.write(Paths.get(outputDir), baos.toByteArray) }
   }
 }
 
