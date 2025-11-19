@@ -100,7 +100,7 @@ class MergeSuite extends AnyFunSuite with GenData with CheckSorted {
 
   }
 
-  test("Merge sorted partitioned files — files are too Many to fit in memory (generate 10MiB 1000 files)") {
+  test("Merge sorted partitioned files — files are too Many to fit in memory (generate 32MiB 100 files)") {
     val partitionSize = 320000
 
     val generateManyData = (0 until 100).map { i => 
@@ -139,6 +139,9 @@ class MergeSuite extends AnyFunSuite with GenData with CheckSorted {
 
     outputDirs.foreach { dir => 
       assert { isSorted(dir) }
+      Files.deleteIfExists(Paths.get(dir))
+    }
+    sortedInputManyDirs.foreach { dir => 
       Files.deleteIfExists(Paths.get(dir))
     }
 
