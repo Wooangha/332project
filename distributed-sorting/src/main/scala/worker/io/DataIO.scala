@@ -14,7 +14,8 @@ trait FileReader[T] {
   val parser: Parser[T]
 
   lazy val contents: Seq[T] = {
-    val bytes = blocking { Files.readAllBytes(Paths.get(inputDir)) }
+    // val bytes = blocking { Files.readAllBytes(Paths.get(inputDir)) }
+    val bytes = Files.readAllBytes(Paths.get(inputDir))
     bytes.sliding(parser.dataSize, parser.dataSize).map(parser.parse(_)).toSeq
   }
 }
@@ -78,7 +79,8 @@ trait FileWriter[T] {
     val bytes = data.foldRight(Vector[Byte]()){ (content, accum) => 
       parser.serialize(content).toVector ++ accum
     }.toArray
-    blocking { Files.write(path, bytes) }
+    // blocking { Files.write(path, bytes) }
+    Files.write(path, bytes)
   }
 }
 

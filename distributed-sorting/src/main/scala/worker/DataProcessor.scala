@@ -87,6 +87,7 @@ object DataProcessor {
           pq.enqueue((nextDatum, fromIter))
         }
         if (size >= maxSize) {
+          println(s"Writing ${savingData.size} data to disk...")
           new DatumFileWriter(makeNewDir(), savingData.toSeq).write()
           savingData.clear()
           size = 0
