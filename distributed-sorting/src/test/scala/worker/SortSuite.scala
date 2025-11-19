@@ -1,6 +1,8 @@
-package worker.io
+package worker
 
 import org.scalatest.funsuite.AnyFunSuite
+
+import common.Data
 
 class SortSuite extends AnyFunSuite {
 

@@ -1,5 +1,6 @@
 package worker.io
 
+import common.{Datum, Key, Value}
 
 trait Parser[T] {
   /** Byte size of the data */

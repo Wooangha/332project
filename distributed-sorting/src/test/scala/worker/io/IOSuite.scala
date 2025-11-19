@@ -4,6 +4,8 @@ import java.nio.file.{Paths, Files}
 
 import org.scalatest.funsuite.AnyFunSuite
 
+import common.Data
+
 class IOSuite extends AnyFunSuite {
   
   test("First, read Ascii and then write it back to a file — the two should be identical.") {

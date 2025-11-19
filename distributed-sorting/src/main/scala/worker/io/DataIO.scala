@@ -6,6 +6,7 @@ import java.io.RandomAccessFile
 import scala.concurrent.blocking
 
 import worker.io.DatumParser.parse
+import common.{Datum, Key, Value}
 
 
 trait FileReader[T] {

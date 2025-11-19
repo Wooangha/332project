@@ -1,4 +1,6 @@
-package worker.io
+package common
+
+import worker.io.{DatumParser, DatumFileReader, DatumFileWriter}
 
 case class Key(key: Vector[Byte]) extends Ordered[Key] {
   override def compare(that: Key): Int = {

@@ -1,10 +1,13 @@
-package worker.io
+package worker
 
 import java.nio.file.{Paths, Files}
 
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+
+import common.{Data, Datum, Key}
+import worker.io.{DatumFileIterator, DatumFileWriter}
 
 object  DataProcessor {
   val tempDirPrefix = "tmpSave/"
