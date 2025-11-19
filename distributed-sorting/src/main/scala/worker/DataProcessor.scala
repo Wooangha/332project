@@ -91,17 +91,20 @@ object DataProcessor {
         if (size >= maxSize) {
           println(s"Writing ${savingData.size} data to disk...")
           val saveDir = makeNewDir()
-          val savFuture = Future {
-            new DatumFileWriter(saveDir, savingData.toSeq).write()
+          val savingDataSeq = savingData.toSeq
+          val saveFuture = Future {
+            new DatumFileWriter(saveDir, savingDataSeq).write()
           }
-          saveFutures = savFuture :: saveFutures
+          saveFutures = saveFuture :: saveFutures
           savingData.clear()
           size = 0
         }
       }
 
       if (savingData.nonEmpty) {
-        new DatumFileWriter(makeNewDir(), savingData.toList).write()
+        val savingDataSeq = savingData.toSeq
+        val saveFuture = Future {new DatumFileWriter(makeNewDir(), savingDataSeq).write()}
+        saveFutures = saveFuture :: saveFutures
         savingData.clear()
       }
 
