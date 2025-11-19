@@ -92,6 +92,5 @@ class DatumFileWriter(val outputDir: String, val data: Seq[Datum]) extends FileW
 }
 
 class DatumFileIterator(val inputDir: String) extends FileIterator[Datum] {
-
   override val parser: Parser[Datum] = DatumParser
 }

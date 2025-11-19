@@ -9,10 +9,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import common.{Data, Datum, Key}
 import worker.io.{DatumFileIterator, DatumFileWriter}
 
-object  DataProcessor {
+object DataProcessor {
   val tempDirPrefix = "tmpSave/"
 
-  def sampling(dataDirLs: List[String], sampleSize: Int): Future[Vector[Key]] = {
+  def sampling(
+      dataDirLs: List[String],
+      sampleSize: Int): Future[Vector[Key]] = {
     val sampleSizePerFile = Math.ceil(sampleSize.toDouble / dataDirLs.length.toDouble).toInt
 
     val futures = for (dir <- dataDirLs)
