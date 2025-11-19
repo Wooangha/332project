@@ -26,7 +26,8 @@ class MasterServerImpl extends MasterServer {
 
 
     ////// for getPartitionRange ///////
-    private val sampleKeyBatches: ListBuffer[Vector[Key]] = ListBuffer.empty
+    // ip -> 그 워커가 보낸 샘플 키 벡터
+    private val sampleKeyMap: TrieMap[String, Vector[Key]] = TrieMap.empty
 
     private val waitingRequestsForPartitionRange: ListBuffer[Promise[PartitionRanges]] = ListBuffer.empty
     
@@ -86,20 +87,25 @@ class MasterServerImpl extends MasterServer {
         var drains: List[Promise[PartitionRanges]] = Nil
 
         lock.synchronized{
+            val ip = request.ip
+
             val keyBatch: Vector[Key] = request.keyData.map(k => Key(k.keyDatum.toByteArray().toVector)).toVector
 
-            sampleKeyBatches += keyBatch
+            sampleKeyMap.update(ip, keyBatch)
 
-            if (sampleKeyBatches.size < NUM_OF_WORKERS) {
+            ////////////디버깅용 프린트 //////////////
+            println(ip)
+
+            if (sampleKeyMap.size < NUM_OF_WORKERS) {
                 val p = Promise[PartitionRanges]()
                 waitingRequestsForPartitionRange += p
                 promiseOpt = Some(p)
             }
             else {
-                val allKeys: Vector[Key] = sampleKeyBatches.flatten.toVector
+                val allKeys: Vector[Key] = sampleKeyMap.values.flatten.toVector
 
                 val ranges: Seq[PartitionRanges.PartitionRange] =
-                computePartitionRanges(allKeys, NUM_OF_WORKERS)
+                    computePartitionRanges(allKeys, NUM_OF_WORKERS)
 
                 val reply = PartitionRanges(partitionRanges = ranges)
                 replyOpt = Some(reply)
