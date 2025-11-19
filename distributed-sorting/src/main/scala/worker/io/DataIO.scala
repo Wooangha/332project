@@ -24,6 +24,7 @@ trait FileReader[T] {
 trait FileIterator[T] extends Iterator[T] with AutoCloseable {
   val inputDir: String
   val parser: Parser[T]
+  val maxChunkSize: Int
 
   private[this] var start: Long = 0L
   private[this] lazy val raf = new RandomAccessFile(inputDir, "r")
@@ -33,21 +34,31 @@ trait FileIterator[T] extends Iterator[T] with AutoCloseable {
   private[this] var position: Long = 0L
   private[this] var nextValue: Option[T] = None
 
+  private[this] var chunk: Array[Byte] = Array.emptyByteArray
+  private[this] var chunkPosition: Int = 0
+
   private[this] def loadNext(): Unit = {
-    if (position + recordSize > fileLength) {
+    if (position + recordSize > fileLength && chunkPosition >= chunk.length) {
       nextValue = None
     } else {
-      val buf = new Array[Byte](recordSize)
-
-      raf.seek(start)
-      val actuallyRead = raf.read(buf)
-      start += actuallyRead
-
-      if (actuallyRead > 0) {
-        nextValue = Some(parser.parse(buf))
-      } else {
-        nextValue = None
+      if (chunkPosition >= chunk.length) {
+        val bytesToRead = Math.min(maxChunkSize * recordSize, (fileLength - position).toInt)
+        chunk = new Array[Byte](bytesToRead)
+        raf.seek(position)
+        val actuallyRead = raf.read(chunk)
+        position += actuallyRead
+        chunkPosition = 0
       }
+
+      val buf = new Array[Byte](recordSize)
+      Array.copy(chunk, chunkPosition, buf, 0, recordSize)
+      chunkPosition += recordSize
+
+      // raf.seek(start)
+      // val actuallyRead = raf.read(buf)
+      // start += actuallyRead
+
+      nextValue = Some(parser.parse(buf))
     }
   }
 
@@ -98,4 +109,5 @@ class DatumFileWriter(val outputDir: String, val data: Seq[Datum]) extends FileW
 
 class DatumFileIterator(val inputDir: String) extends FileIterator[Datum] {
   override val parser: Parser[Datum] = DatumParser
+  override val maxChunkSize: Int = 10000
 }
