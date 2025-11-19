@@ -27,25 +27,37 @@ object DataProcessor {
 
   def sortAndPartitioning(
       dataDirLs: List[String],
-      partition: Key => String): Future[Unit] = {
+      partition: Key => String): Future[List[String]] = {
 
-    val futures = for ((inputDir, numOfData) <- dataDirLs.zip(0 until dataDirLs.length))
+    val dataLoadLs = for ((inputDir, numOfData) <- dataDirLs.zip(0 until dataDirLs.length))
       yield Future {
-        val data = Data.fromFile(inputDir).sort().partitioning(partition)
-        for ((ip, partData) <- data) Future {
-          partData.save(tempDirPrefix + ip + "-" + numOfData.toString)
-        }
+        (numOfData, Data.fromFile(inputDir).sort().partitioning(partition))
       }
 
-    Future.sequence(futures).map(_ => ())
+    val savedDataLoadLs = dataLoadLs.map { dataLoad =>
+      dataLoad.flatMap { case (numOfData, data) =>
+        val saveFutures = for ((ip, partData) <- data) yield Future {
+          val saveDir = s"${tempDirPrefix}${ip}-${numOfData.toString}"
+          partData.save(saveDir)
+          saveDir
+        }
+        Future.sequence(saveFutures)
+      }
+    }
+
+    Future.sequence(savedDataLoadLs).flatMap { dirsLis =>
+      Future.successful(dirsLis.flatten)
+    }
   }
 
   def removeTempDir(): Unit = {
     val tempDirPath = Paths.get(tempDirPrefix)
     if (Files.exists(tempDirPath)) {
-      Files.walk(tempDirPath)
-        .sorted(java.util.Comparator.reverseOrder())
-        .forEach(path => Files.delete(path))
+      Files.walk(tempDirPath, 1).forEach { path => 
+        if (!Files.isDirectory(path)) {
+          Files.delete(path)
+        }
+      }
     }
   }
 
