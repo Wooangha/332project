@@ -22,6 +22,11 @@ case class Key(key: Vector[Byte]) extends Ordered[Key] {
   }
 }
 
+object Key {
+  val min = Key(Vector.fill(10)(0.toByte))
+  val max = Key(Vector.fill(10)(255.toByte))
+}
+
 case class Value(value: Vector[Byte]) {
   override def toString(): String = {
     s"Value(${value.map(b => f"${b & 0xFF}%02X").mkString(", ")})"
