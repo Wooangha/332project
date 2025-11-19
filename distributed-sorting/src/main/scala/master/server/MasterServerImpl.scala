@@ -1,5 +1,5 @@
 import com.master.server.MasterServer.MasterServerGrpc.MasterServer
-import com.master.server.MasterServer.{WorkerInfo, RegisterReply, Version}
+import com.master.server.MasterServer.{WorkerInfo, RegisterReply, Version, SampleKeyData, PartitionRanges, CanShutdownWorkerServerReply}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -9,10 +9,13 @@ import java.util.concurrent.atomic.AtomicInteger // for Atomic Int in version
 
 import scala.collection.mutable.ListBuffer // for watingRequestsForRegister
 
+import com.google.protobuf.ByteString
+import common.Key
 
 class MasterServerImpl extends MasterServer {
     val NUM_OF_WORKERS = 2
 
+    ////// for register ////////
     // thread-safe하게 TrieMap으로 구현
     private val workerInfosMap: TrieMap[String, Int] = TrieMap.empty
 
@@ -20,6 +23,12 @@ class MasterServerImpl extends MasterServer {
     private val currentVersion = new AtomicInteger(0)
 
     private val waitingRequestsForRegister: ListBuffer[Promise[RegisterReply]] = ListBuffer.empty
+
+
+    ////// for getPartitionRange ///////
+    private val sampleKeyBatches: ListBuffer[Vector[Key]] = ListBuffer.empty
+
+    private val waitingRequestsForPartitionRange: ListBuffer[Promise[PartitionRanges]] = ListBuffer.empty
     
     //공용 lock 객체
     private val lock = new Object
@@ -70,8 +79,79 @@ class MasterServerImpl extends MasterServer {
             }
         }
     }
-    def canShutdownWorkerServer(request: com.google.protobuf.empty.Empty): scala.concurrent.Future[com.master.server.MasterServer.CanShutdownWorkerServerReply] = ???
-    def getUpdatedWorkerInfo(request: com.master.server.MasterServer.Version): scala.concurrent.Future[com.master.server.MasterServer.WorkerInfo] = ???
-    def getPartitionRange(request: com.master.server.MasterServer.SampleKeyData): scala.concurrent.Future[com.master.server.MasterServer.PartitionRanges] = ???
+
+    def getPartitionRange(request: SampleKeyData): Future[PartitionRanges] = {
+        var promiseOpt: Option[Promise[PartitionRanges]] = None
+        var replyOpt: Option[PartitionRanges] = None
+        var drains: List[Promise[PartitionRanges]] = Nil
+
+        lock.synchronized{
+            val keyBatch: Vector[Key] = request.keyData.map(k => Key(k.keyDatum.toByteArray().toVector)).toVector
+
+            sampleKeyBatches += keyBatch
+
+            if (sampleKeyBatches.size < NUM_OF_WORKERS) {
+                val p = Promise[PartitionRanges]()
+                waitingRequestsForPartitionRange += p
+                promiseOpt = Some(p)
+            }
+            else {
+                val allKeys: Vector[Key] = sampleKeyBatches.flatten.toVector
+
+                val ranges: Seq[PartitionRanges.PartitionRange] =
+                computePartitionRanges(allKeys, NUM_OF_WORKERS)
+
+                val reply = PartitionRanges(partitionRanges = ranges)
+                replyOpt = Some(reply)
+
+                drains = waitingRequestsForPartitionRange.toList
+                waitingRequestsForPartitionRange.clear()
+            }
+        }
+
+        promiseOpt match {
+            case Some(p) => p.future
+            case None => {
+                val reply = replyOpt.get
+                drains.foreach(_.trySuccess(reply))
+                Future.successful(reply)
+            }
+        }
+    }
+
+    private def computePartitionRanges(allKeys: Vector[Key], numPartitions: Int): Seq[PartitionRanges.PartitionRange] = {
+        val sorted = allKeys.sorted
+        val total  = sorted.length
+
+        val ranges: ListBuffer[PartitionRanges.PartitionRange] = ListBuffer.empty
+
+        for (i <- 0 until numPartitions) {
+
+            val startIdx = (i * total) / numPartitions
+            val endIdx   = ((i + 1) * total) / numPartitions
+
+            val startKey =
+            if (i == 0) Key.min
+            else sorted(startIdx)
+
+            val endKey =
+            if (i == numPartitions - 1) Key.max
+            else sorted(endIdx)
+
+            val pr = PartitionRanges.PartitionRange(
+                // 프로토 mutable 사용 안 되므로, copyFrom으로 Vector[Byte] -> Array[Byte] -> ByteString 변환
+                startKey = ByteString.copyFrom(startKey.key.toArray),
+                endKey   = ByteString.copyFrom(endKey.key.toArray)
+            )
+
+            ranges += pr
+        }
+
+        ranges.toSeq
+    }
+
+    def getUpdatedWorkerInfo(request: Version): Future[WorkerInfo] = ???
+
+    def canShutdownWorkerServer(request: com.google.protobuf.empty.Empty): Future[CanShutdownWorkerServerReply] = ???
 
 }
