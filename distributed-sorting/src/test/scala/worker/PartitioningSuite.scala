@@ -43,7 +43,7 @@ class PartitioningSuite extends AnyFunSuite with GenData with CheckSorted {
   }
 
   test("Test sort and partitioning function") {
-    val inputDirs = List("src/test/resources/partition1--", "src/test/resources/partition2--", "src/test/resources/partition3--")
+    val inputDirs = List("src/test/resources/partition1-partitioning", "src/test/resources/partition2-partitioning", "src/test/resources/partition3-partitioning")
 
     val partitionSize = 100000
 

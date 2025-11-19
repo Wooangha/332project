@@ -13,7 +13,7 @@ import worker.DataProcessor.sampling
 class SamplingSuite extends AnyFunSuite with GenData with CheckSorted {
 
   test("Sample data from a file — samples exist in the data") {
-    val inputDirs = List("src/test/resources/partition1", "src/test/resources/partition2", "src/test/resources/partition3")
+    val inputDirs = List("src/test/resources/partition1-sampling", "src/test/resources/partition2-sampling", "src/test/resources/partition3-sampling")
 
     val partitionSize = 100000
 
