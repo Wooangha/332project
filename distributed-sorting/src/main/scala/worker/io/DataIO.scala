@@ -76,7 +76,7 @@ trait FileWriter[T] {
     val path = Paths.get(outputDir)
     Files.createDirectories(path.getParent)
     val bytes = data.foldRight(Vector[Byte]()){ (content, accum) => 
-      parser.unparse(content).toVector ++ accum
+      parser.serialize(content).toVector ++ accum
     }.toArray
     blocking { Files.write(path, bytes) }
   }

@@ -7,7 +7,7 @@ trait Parser[T] {
   val dataSize: Int
 
   def parse(s: Seq[Byte]): T
-  def unparse(t: T): Seq[Byte]
+  def serialize(t: T): Seq[Byte]
 }
 
 
@@ -22,7 +22,7 @@ object DatumParser extends Parser[Datum] {
     }
   }
 
-  override def unparse(datum: Datum): Vector[Byte] = datum match {
+  override def serialize(datum: Datum): Vector[Byte] = datum match {
     case Datum(key, value) => key.key ++ value.value
   }
 }
