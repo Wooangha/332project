@@ -89,11 +89,12 @@ object DataProcessor {
           pq.enqueue((nextDatum, fromIter))
         }
         if (size >= maxSize) {
-          println(s"Writing ${savingData.size} data to disk...")
           val saveDir = makeNewDir()
+          println(s"Writing ${savingData.size} data to $saveDir...")
           val savingDataSeq = savingData.toSeq
           val saveFuture = Future {
             new DatumFileWriter(saveDir, savingDataSeq).write()
+            println(s"Finished writing to $saveDir.")
           }
           saveFutures = saveFuture :: saveFutures
           savingData.clear()
