@@ -102,8 +102,9 @@ object DataProcessor {
       }
 
       if (savingData.nonEmpty) {
+        val saveDir = makeNewDir()
         val savingDataSeq = savingData.toSeq
-        val saveFuture = Future {new DatumFileWriter(makeNewDir(), savingDataSeq).write()}
+        val saveFuture = Future {new DatumFileWriter(saveDir, savingDataSeq).write()}
         saveFutures = saveFuture :: saveFutures
         savingData.clear()
       }
