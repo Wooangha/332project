@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 message WorkerInfo {
   string ip = 1;
   uint32 port = 2;
+  bool isShuffle = 3;
 }
 message Version {
   uint32 version = 1;
@@ -42,6 +43,6 @@ message CanShutdownWorkerServerReply {
 service MasterServer {
   rpc register (WorkerInfo) returns (RegisterReply);
   rpc getPartitionRange (SampleKeyData) returns (PartitionRanges);
-  rpc getUpdatedWorkerInfo (Version) returns (WorkerInfo);
+  // rpc getUpdatedWorkerInfo (Version) returns (WorkerInfo);
   rpc canShutdownWorkerServer (google.protobuf.Empty) returns (CanShutdownWorkerServerReply);
 }
