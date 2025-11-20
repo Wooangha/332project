@@ -37,6 +37,7 @@ class MasterServerImpl extends MasterServer {
     def register(request: WorkerInfo): Future[RegisterReply] = {
         val ip = request.ip
         val port = request.port
+        val isShuffle = request.isShuffle
 
         // lock 밖에서 사용될 애들
         var promiseOpt: Option[Promise[RegisterReply]] = None
@@ -44,10 +45,6 @@ class MasterServerImpl extends MasterServer {
         var drains: List[Promise[RegisterReply]] = Nil
 
         lock.synchronized{
-        
-            workerInfosMap += (ip -> port)
-
-            val newVersion = currentVersion.incrementAndGet()
 
             def makeReply(replyVersion: Int): RegisterReply = {
                 val snap = workerInfosMap.readOnlySnapshot()
@@ -56,17 +53,28 @@ class MasterServerImpl extends MasterServer {
                 RegisterReply(workerInfos = workerList, version = Some(Version(version = replyVersion)))
             }
 
-            if(workerInfosMap.size < NUM_OF_WORKERS){
-                val p = Promise[RegisterReply]()
-                waitingRequestsForRegister += p
-                promiseOpt = Some(p)
+            if(!isShuffle){ // 처음 등록 용 register
+                workerInfosMap += (ip -> port)
+
+                val newVersion = currentVersion.incrementAndGet()
+
+                if(workerInfosMap.size < NUM_OF_WORKERS){
+                    val p = Promise[RegisterReply]()
+                    waitingRequestsForRegister += p
+                    promiseOpt = Some(p)
+                }
+                else{
+                    val reply = makeReply(newVersion)
+                    replyOpt = Some(reply)
+                    
+                    drains = waitingRequestsForRegister.toList
+                    waitingRequestsForRegister.clear()
+                }
             }
-            else{
-                val reply = makeReply(newVersion)
+            else{ // 셔플 단계에서 새로운 workerInfo 받기 위한, read-only register
+                val curVersion = currentVersion.get()
+                val reply = makeReply(curVersion)
                 replyOpt = Some(reply)
-                
-                drains = waitingRequestsForRegister.toList
-                waitingRequestsForRegister.clear()
             }
         }
 
@@ -153,7 +161,7 @@ class MasterServerImpl extends MasterServer {
         ranges.toSeq
     }
 
-    def getUpdatedWorkerInfo(request: Version): Future[WorkerInfo] = ???
+    // def getUpdatedWorkerInfo(request: Version): Future[WorkerInfo] = ???
 
     def canShutdownWorkerServer(request: com.google.protobuf.empty.Empty): Future[CanShutdownWorkerServerReply] = ???
 
