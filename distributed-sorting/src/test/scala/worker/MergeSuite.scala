@@ -8,10 +8,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.Sequential
 
-import common.{GenData, CheckSorted}
-import worker.DataProcessor.merge
-import common.Data
-import worker.DataProcessor.removeTempDir
+import common.{GenData, CheckSorted, Data, Datum}
+import worker.DataProcessor.{merge, removeTempDir}
 
 class MergeSuite extends AnyFunSuite with GenData with CheckSorted {
 
