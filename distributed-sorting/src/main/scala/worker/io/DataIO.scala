@@ -2,6 +2,7 @@ package worker.io
 
 import java.nio.file.{Paths, Files, Path}
 import java.io.{FileInputStream, BufferedInputStream, DataInputStream, EOFException, IOException, ByteArrayOutputStream}
+import java.io.{FileOutputStream, BufferedOutputStream}
 
 import scala.concurrent.blocking
 
@@ -13,7 +14,7 @@ abstract class FileReader[T] {
   val inputDir: String
   val parser: Parser[T]
 
-  lazy val contents: Seq[T] = {
+  lazy val  contents: Seq[T] = {
     val bytes = Files.readAllBytes(Paths.get(inputDir))
     bytes.sliding(parser.dataSize, parser.dataSize).map(parser.parse(_)).toSeq
   }
@@ -62,13 +63,16 @@ abstract class FileWriter[T] {
   val parser: Parser[T]
 
   def write(): Unit = {
-    val baos = new ByteArrayOutputStream()
-    data.foreach { t =>
-      baos.write(parser.serialize(t).toArray)
+    val path = Paths.get(outputDir)
+    Files.createDirectories(path.getParent)
+    val bos = new BufferedOutputStream(new FileOutputStream(path.toFile))
+    try {
+      data.foreach { t =>
+        bos.write(parser.serialize(t).toArray)
+      }
+    } finally {
+      bos.close()
     }
-    Files.createDirectories(Paths.get(outputDir).getParent)
-    val bytes = baos.toByteArray
-    blocking { Files.write(Paths.get(outputDir), bytes) }
   }
 }
 

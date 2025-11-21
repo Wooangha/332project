@@ -21,7 +21,7 @@ class IOSuite extends AnyFunSuite with GenData {
 
     assert {
       val newData = Data.fromFile(outputDir)
-      newData.data === data.data
+      newData === data
     }
     cleanupGeneratedData()
     Files.deleteIfExists(Paths.get(outputDir))

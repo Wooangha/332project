@@ -33,7 +33,13 @@ class MergeSuite extends AnyFunSuite with GenData with CheckSorted {
         sortedData
       }    
 
-    val sortedData = (data.foldLeft(new Data(Vector.empty)) { (acc, d) => d ++ acc }).sort()
+    val sortedData = {
+      var sortedArray = Array.empty[Datum]
+      for (d <- data) {
+        sortedArray ++= d.data
+      }
+      new Data(sortedArray).sort()
+    }
 
     merge(sortedInputDirs, outputDirBuilder, partitionSize * inputDirs.length)
 
@@ -41,7 +47,7 @@ class MergeSuite extends AnyFunSuite with GenData with CheckSorted {
 
     assert {
       val outputData = Data.fromFile(outputDirBuilder())
-      outputData.data === sortedData.data
+      outputData === sortedData
     }
 
     cleanupGeneratedData()
@@ -74,16 +80,22 @@ class MergeSuite extends AnyFunSuite with GenData with CheckSorted {
         sortedData
       }    
 
-    val sortedData = (data.foldLeft(new Data(Vector.empty)) { (acc, d) => d ++ acc }).sort()
+    val sortedData = {
+      var sortedArray = Array.empty[Datum]
+      for (d <- data) {
+        sortedArray ++= d.data
+      }
+      new Data(sortedArray).sort()
+    }
 
     merge(sortedInputDirs, outputDirBuilder, partitionSize)
 
-    val outputData = outputDirs.foldLeft(new Data(Vector.empty)) { (acc, dir) => 
+    val outputData = outputDirs.foldLeft(new Data(Array.empty)) { (acc, dir) => 
       val outputData = Data.fromFile(dir)
       acc ++ outputData
     }
 
-    assert { outputData.data === sortedData.data }
+    assert { outputData === sortedData }
 
     for (dir <- outputDirs) {
       assert { isSorted(dir) }

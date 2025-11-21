@@ -18,11 +18,11 @@ object DatumParser extends Parser[Datum] {
     require(s.length == 100, "The Length of Bytes must be 100")
 
     s.splitAt(10) match { case (key, value) =>
-      Datum(Key(key.toVector), Value(value.toVector))
+      Datum(Key(key.toArray), Value(value.toArray))
     }
   }
 
-  override def serialize(datum: Datum): Vector[Byte] = datum match {
+  override def serialize(datum: Datum): Seq[Byte] = datum match {
     case Datum(key, value) => key.key ++ value.value
   }
 }

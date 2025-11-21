@@ -15,7 +15,7 @@ object DataProcessor {
 
   def sampling(
       dataDirLs: List[String],
-      sampleSize: Int): Future[Vector[Key]] = {
+      sampleSize: Int): Future[Array[Key]] = {
     val sampleSizePerFile = Math.ceil(sampleSize.toDouble / dataDirLs.length.toDouble).toInt
 
     val futures = for (dir <- dataDirLs)
@@ -23,7 +23,7 @@ object DataProcessor {
         Data.fromFile(dir).sampling(sampleSizePerFile)
       }
 
-    Future.sequence(futures).map(_.toVector.flatten)
+    Future.sequence(futures).map(_.toArray.flatten)
   }
 
   def sortAndPartitioning(

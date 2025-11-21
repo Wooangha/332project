@@ -13,11 +13,11 @@ import worker.DataProcessor.{sortAndPartitioning, removeTempDir}
 class PartitioningSuite extends AnyFunSuite with GenData with CheckSorted {
   val workerInfos = List("workerC", "workerE", "workerA", "workerD", "workerB")
   val partitionRanges = List(
-    (Key(Vector.fill(10)(20.toByte)), Key(Vector.fill(10)(70.toByte))),
-    (Key(Vector.fill(10)(0.toByte)), Key(Vector.fill(10)(20.toByte))),
-    (Key(Vector.fill(10)(150.toByte)), Key(Vector.fill(10)(200.toByte))),
-    (Key(Vector.fill(10)(200.toByte)), Key(Vector.fill(10)(255.toByte))),
-    (Key(Vector.fill(10)(70.toByte)), Key(Vector.fill(10)(150.toByte))))
+    (Key(Array.fill(10)(20.toByte)), Key(Array.fill(10)(70.toByte))),
+    (Key(Array.fill(10)(0.toByte)), Key(Array.fill(10)(20.toByte))),
+    (Key(Array.fill(10)(150.toByte)), Key(Array.fill(10)(200.toByte))),
+    (Key(Array.fill(10)(200.toByte)), Key(Array.fill(10)(255.toByte))),
+    (Key(Array.fill(10)(70.toByte)), Key(Array.fill(10)(150.toByte))))
 
   // workerA -> [0, 20)
   // workerB -> [20, 70)
@@ -31,7 +31,7 @@ class PartitioningSuite extends AnyFunSuite with GenData with CheckSorted {
 
     val testKeys = for {
       i <- List(25, 75, 125, 175, 225, 255, 0, 50, 100, 150, 200)
-    } yield Key(Vector.fill(10)(i.toByte))
+    } yield Key(Array.fill(10)(i.toByte))
 
     val expectedAssignments = List(
       "workerB", "workerC", "workerC", "workerD", "workerE", "workerE", 
