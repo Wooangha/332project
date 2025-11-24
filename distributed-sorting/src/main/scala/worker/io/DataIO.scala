@@ -20,7 +20,13 @@ abstract class FileReader[T] {
   }
 }
 
-
+/**
+  * File iterator to read data from file in chunks
+  *
+  * @param inputDir input file path
+  * @param parser parser to parse data from bytes
+  * @param maxChunkSize maximum number of items to read in one chunk
+  */
 abstract class FileIterator[T](
     val inputDir: String,
     val parser: Parser[T],
