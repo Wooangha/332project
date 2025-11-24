@@ -32,8 +32,11 @@ trait GenData {
   final def cleanupGeneratedData(): Unit = genDirectories.synchronized {
     genDirectories.foreach { dir =>
       val path = Paths.get(dir)
-      if (Files.exists(path)) {
-        Files.delete(path)
+      try {
+        Files.deleteIfExists(path)
+      } catch {
+        case ex: Exception =>
+          System.err.println(s"[WARN] Failed to delete $path: ${ex.getMessage}")
       }
     }
     genDirectories.clear()
