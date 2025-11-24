@@ -4,6 +4,8 @@ import java.security.KeyException
 
 import common.Key
 
+class PartitionNotFoundException(msg: String) extends KeyException(msg)
+
 object Util {
 
   /**
@@ -26,7 +28,8 @@ object Util {
           key >= start && key < end
         }
         if (idx == -1) {
-          throw new KeyException(s"No partition found for key: ${key}, now partitionRanges: ${partitionRange.toString()}")
+          throw new PartitionNotFoundException(
+            s"No partition found for key: ${key}, now partitionRanges: ${partitionRange.toString()}")
         } else {
           sortedWorkerInfos(idx)
         }
