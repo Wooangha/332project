@@ -44,6 +44,7 @@ abstract class FileIterator[T](
         System.err.println(s"IOException while reading from $inputDir: " + e)
         None
     }
+  }
 
   override def hasNext: Boolean = nextItem.isDefined
 
