@@ -24,10 +24,12 @@ trait GenData {
     } else {
       s"$gensortPath -b$beginningRecord $numRecords $dir".!(emptyLogger)
     }
-    genDirectories += dir
+    genDirectories.synchronized {
+      genDirectories += dir
+    }
   }
 
-  final def cleanupGeneratedData(): Unit = {
+  final def cleanupGeneratedData(): Unit = genDirectories.synchronized {
     genDirectories.foreach { dir =>
       val path = Paths.get(dir)
       if (Files.exists(path)) {
