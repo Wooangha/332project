@@ -52,7 +52,18 @@ abstract class FileIterator[T](
     res
   }
 
-  override def close(): Unit = dis.close()
+  override def close(): Unit = {
+    // Explicitly close all streams in reverse order of creation
+    try {
+      dis.close()
+    } finally {
+      try {
+        bis.close()
+      } finally {
+        fis.close()
+      }
+    }
+  }
 }
 
 
