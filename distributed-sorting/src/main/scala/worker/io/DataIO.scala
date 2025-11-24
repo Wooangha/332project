@@ -40,9 +40,10 @@ abstract class FileIterator[T](
       Some(parser.parse(buf))
     } catch {
       case _: EOFException => None
-      case _: IOException => None
+      case e: IOException =>
+        System.err.println(s"IOException while reading from $inputDir: " + e)
+        None
     }
-  }
 
   override def hasNext: Boolean = nextItem.isDefined
 
