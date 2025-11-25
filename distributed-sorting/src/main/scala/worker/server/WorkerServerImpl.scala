@@ -26,7 +26,7 @@ class WorkerServerImpl(tempDir: String)
 
    private def setPartitionDone(): Unit = {
 
-    println("[WorkerServer] Partition 완료됨 (internal)")
+    println("[WorkerServer] Partition 완료됨")
 
     // partition 완료 표시
     isPartitionDone = true
@@ -46,11 +46,12 @@ class WorkerServerImpl(tempDir: String)
     override def getPartitionData(
         request: Ip,
         responseObserver: StreamObserver[PartitionData]
-    ): Unit = lock.synchronized {
+    ): Unit = {
 
         val ip = request.ip
         println(s"[WorkerServer] getPartitionData 요청 받음: from=$ip")
 
+        lock.synchronized {
         if (isPartitionDone) {
             println("[WorkerServer] Partition 끝! 즉시 전송")
             sendPartitionData(ip, responseObserver)
@@ -58,6 +59,10 @@ class WorkerServerImpl(tempDir: String)
             println(s"[WorkerServer] Partition 미완료 → 대기 리스트로 저장: $ip")
             waitingRequestForGetPartitionData.put(ip, responseObserver)
         }
+    }
+        
+
+
     }
 
     /** 서버 생존 체크 */
