@@ -10,7 +10,7 @@ object MasterMain extends App {
 
     val server = NettyServerBuilder
     .forPort(port)
-    .addService(MasterServerGrpc.bindService(new MasterServerImpl, ec))
+    .addService(MasterServerGrpc.bindService(new MasterServerImpl(3), ec))
     .build.start()
 
     println(s"[Master] Server Started on port: $port")

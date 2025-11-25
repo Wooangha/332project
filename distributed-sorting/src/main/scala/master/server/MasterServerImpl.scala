@@ -19,9 +19,9 @@ import scala.collection.mutable.{Set => MutableSet}
 import scala.util.{Success, Failure}
 import com.worker.server.WorkerServer.WorkerSeverGrpc
 import com.google.protobuf.empty.Empty
+import scala.concurrent.blocking
 
-class MasterServerImpl extends MasterServer {
-    val NUM_OF_WORKERS = 3
+class MasterServerImpl(numOfWorkers: Int) extends MasterServer {
 
     ////// for register ///////
     // thread-safe하게 TrieMap으로 구현
@@ -72,7 +72,7 @@ class MasterServerImpl extends MasterServer {
 
                 val newVersion = currentVersion.incrementAndGet()
 
-                if(workerInfosMap.size < NUM_OF_WORKERS){
+                if(workerInfosMap.size < numOfWorkers){
                     val p = Promise[RegisterReply]()
                     waitingRequestsForRegister += p
                     promiseOpt = Some(p)
@@ -115,7 +115,7 @@ class MasterServerImpl extends MasterServer {
 
             sampleKeyMap.update(ip, keyBatch)
 
-            if (sampleKeyMap.size < NUM_OF_WORKERS) {
+            if (sampleKeyMap.size < numOfWorkers) {
                 val p = Promise[PartitionRanges]()
                 waitingRequestsForPartitionRange += p
                 promiseOpt = Some(p)
@@ -124,7 +124,7 @@ class MasterServerImpl extends MasterServer {
                 val allKeys: Vector[Key] = sampleKeyMap.values.flatten.toVector
 
                 val ranges: Seq[PartitionRanges.PartitionRange] =
-                    computePartitionRanges(allKeys, NUM_OF_WORKERS)
+                    computePartitionRanges(allKeys, numOfWorkers)
 
                 val reply = PartitionRanges(partitionRanges = ranges)
                 replyOpt = Some(reply)
@@ -192,7 +192,7 @@ class MasterServerImpl extends MasterServer {
 
             shutdownRequestIps += callerIp
 
-            if(shutdownRequestIps.size == NUM_OF_WORKERS){
+            if(shutdownRequestIps.size == numOfWorkers){
                 workerSnapshot = workerInfosMap.readOnlySnapshot().iterator.toSeq
                 needIsAliveCheck = true
             }
@@ -207,9 +207,11 @@ class MasterServerImpl extends MasterServer {
                         val channel = ManagedChannelBuilder.forAddress(ip, port).usePlaintext().build()
                         val stub = WorkerSeverGrpc.blockingStub(channel)
 
-                        try{
-                            val reply = stub.isAlive(Empty.defaultInstance)
-                            reply.isAlive && reply.isDone
+                        try {
+                            blocking {
+                                val reply = stub.isAlive(Empty.defaultInstance)
+                                reply.isAlive && reply.isDone
+                            }
                         } catch{ // 해당 ip, port로의 stub이 에러 나면(워커 서버 죽었다던지..) -> false
                             case _ : Throwable => false
                         } finally{
