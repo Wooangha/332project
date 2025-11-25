@@ -2,14 +2,19 @@ syntax = "proto3";
 
 package com.master.server;
 
-import "google/protobuf/empty.proto";
-
 message WorkerInfo {
   string ip = 1;
   uint32 port = 2;
+  bool isShuffle = 3;
 }
+
 message Version {
   uint32 version = 1;
+}
+
+message RegisterRequest{
+  WorkerInfo workerInfo = 1;
+  bool isShuffle = 2;
 }
 
 message RegisterReply {
@@ -18,19 +23,25 @@ message RegisterReply {
 }
 
 message SampleKeyData {
+  string ip = 1;   // 샘플 보낸 워커의 ip를 담아야 getPartitionRange에서 웨리포 풀 조건 작성 가능함
+
   message Key {
-    string keyDatum = 1;
+    bytes keyDatum = 1;
   }
-  repeated Key keyData = 1;
+  repeated Key keyData = 2;
 }
 
 message PartitionRanges {
   // [startKey, endKey) === (startKey <= key < endKey)
   message PartitionRange {
-    string startKey = 1;
-    string endKey = 2;
+    bytes startKey = 1;
+    bytes endKey = 2;
   }
   repeated PartitionRange PartitionRanges = 1;
+}
+
+message Ip {
+  string ip = 1;
 }
 
 message CanShutdownWorkerServerReply {
@@ -38,8 +49,8 @@ message CanShutdownWorkerServerReply {
 }
 
 service MasterServer {
-  rpc register (WorkerInfo) returns (RegisterReply);
+  rpc register (RegisterRequest) returns (RegisterReply);
   rpc getPartitionRange (SampleKeyData) returns (PartitionRanges);
-  rpc getUpdatedWorkerInfo (Version) returns (WorkerInfo);
-  rpc canShutdownWorkerServer (google.protobuf.Empty) returns (CanShutdownWorkerServerReply);
+  // rpc getUpdatedWorkerInfo (Version) returns (WorkerInfo);
+  rpc canShutdownWorkerServer (Ip) returns (CanShutdownWorkerServerReply);
 }

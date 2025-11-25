@@ -14,6 +14,7 @@ message PartitionData {
 
 message IsAliveReply {
   bool isAlive = 1;
+  bool isDone = 2;
 }
 
 service WorkerSever {
