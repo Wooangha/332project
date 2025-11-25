@@ -24,13 +24,17 @@ class WorkerServerImpl(tempDir: String)
     private val lock = new Object
 
     private def setPartitionDone(): Unit = {
-        println("[WorkerServer] Partition 완료됨")
-        // partition 완료 표시
-        isPartitionDone = true
 
-        // 대기 중이던 getPartitionData 요청들 꺼내기
-        val pending = waitingRequestForGetPartitionData.asScala.toList
-        waitingRequestForGetPartitionData.clear()
+        
+        val pending = lock.synchronized {
+            isPartitionDone = true
+            // partition 완료 표시
+
+            // 대기 중이던 getPartitionData 요청들 꺼내기
+            val p = waitingRequestForGetPartitionData.asScala.toList
+            waitingRequestForGetPartitionData.clear()
+            p
+        }
 
         // 각 대기 요청에게 파일 보내기
         pending.foreach { case (ip, observer) => sendPartitionData(ip, observer)}
@@ -78,7 +82,7 @@ class WorkerServerImpl(tempDir: String)
 
         try {
             in = Files.newInputStream(filePath)
-            val buffer = new Array[Byte](1024 * 1024)
+            val buffer = new Array[Byte](100)
 
             var read = in.read(buffer)
             while (read != -1) {
