@@ -99,7 +99,7 @@ class MasterServerImpl extends MasterServer {
         lock.synchronized{
             val ip = request.ip
 
-            val keyBatch: Vector[Key] = request.keyData.map(k => Key(k.keyDatum.toByteArray().toVector)).toVector
+            val keyBatch: Vector[Key] = request.keyData.map(k => Key(k.keyDatum.toByteArray())).toVector
 
             sampleKeyMap.update(ip, keyBatch)
 
@@ -153,8 +153,8 @@ class MasterServerImpl extends MasterServer {
 
             val pr = PartitionRanges.PartitionRange(
                 // 프로토 mutable 사용 안 되므로, copyFrom으로 Vector[Byte] -> Array[Byte] -> ByteString 변환
-                startKey = ByteString.copyFrom(startKey.key.toArray),
-                endKey   = ByteString.copyFrom(endKey.key.toArray)
+                startKey = ByteString.copyFrom(startKey.key),
+                endKey   = ByteString.copyFrom(endKey.key)
             )
 
             ranges += pr
