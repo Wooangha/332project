@@ -5,6 +5,7 @@ package com.master.server;
 message WorkerInfo {
   string ip = 1;
   uint32 port = 2;
+  bool isShuffle = 3;
 }
 
 message Version {
