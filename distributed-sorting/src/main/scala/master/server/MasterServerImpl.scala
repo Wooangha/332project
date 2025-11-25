@@ -13,10 +13,17 @@ import com.google.protobuf.ByteString
 import common.Key
 import com.master.server.MasterServer.RegisterRequest
 
+// below for canShutdownWorkerServer
+import io.grpc.ManagedChannelBuilder
+import scala.collection.mutable.{Set => MutableSet}
+import scala.util.{Success, Failure}
+import com.worker.server.WorkerServer.WorkerSeverGrpc
+import com.google.protobuf.empty.Empty
+
 class MasterServerImpl extends MasterServer {
     val NUM_OF_WORKERS = 3
 
-    ////// for register ////////
+    ////// for register ///////
     // thread-safe하게 TrieMap으로 구현
     private val workerInfosMap: TrieMap[String, Int] = TrieMap.empty
 
@@ -32,6 +39,11 @@ class MasterServerImpl extends MasterServer {
 
     private val waitingRequestsForPartitionRange: ListBuffer[Promise[PartitionRanges]] = ListBuffer.empty
     
+
+    ////// for canShutdownWorkerServer ///////
+    private val shutdownRequestIps: MutableSet[String] = MutableSet.empty
+    private var globalCanshutdownPromise: Option[Promise[CanShutdownWorkerServerReply]] = None
+
     //공용 lock 객체
     private val lock = new Object
 
@@ -152,7 +164,6 @@ class MasterServerImpl extends MasterServer {
             else sorted(endIdx)
 
             val pr = PartitionRanges.PartitionRange(
-                // 프로토 mutable 사용 안 되므로, copyFrom으로 Vector[Byte] -> Array[Byte] -> ByteString 변환
                 startKey = ByteString.copyFrom(startKey.key),
                 endKey   = ByteString.copyFrom(endKey.key)
             )
@@ -165,6 +176,72 @@ class MasterServerImpl extends MasterServer {
 
     // def getUpdatedWorkerInfo(request: Version): Future[WorkerInfo] = ???
 
-    def canShutdownWorkerServer(request: Ip): Future[CanShutdownWorkerServerReply] = ???
+    def canShutdownWorkerServer(request: Ip): Future[CanShutdownWorkerServerReply] = {
+        val callerIp = request.ip
+
+        var needIsAliveCheck = false
+        var workerSnapshot: Seq[(String, Int)] = Nil // workerInfosMap read-only로 읽으려고
+        var promise: Promise[CanShutdownWorkerServerReply] = null
+
+        lock.synchronized{
+            // 이번 canShutdown 시도에서 사용될 promise 준비
+            if(globalCanshutdownPromise.isEmpty){
+                globalCanshutdownPromise = Some(Promise[CanShutdownWorkerServerReply]())
+            }
+            promise = globalCanshutdownPromise.get
+
+            shutdownRequestIps += callerIp
+
+            if(shutdownRequestIps.size == NUM_OF_WORKERS){
+                workerSnapshot = workerInfosMap.readOnlySnapshot().iterator.toSeq
+                needIsAliveCheck = true
+            }
+        }
+
+        implicit val ec: ExecutionContext = ExecutionContext.global
+
+        if(needIsAliveCheck){
+            val checksF: Future[Seq[Boolean]] = Future.traverse(workerSnapshot) {
+                case (ip, port) => {
+                    Future{
+                        val channel = ManagedChannelBuilder.forAddress(ip, port).usePlaintext().build()
+                        val stub = WorkerSeverGrpc.blockingStub(channel)
+
+                        try{
+                            val reply = stub.isAlive(Empty.defaultInstance)
+                            reply.isAlive && reply.isDone
+                        } catch{ // 해당 ip, port로의 stub이 에러 나면(워커 서버 죽었다던지..) -> false
+                            case _ : Throwable => false
+                        } finally{
+                            channel.shutdown()
+                        }
+                    }
+                }
+            }
+            checksF.onComplete{
+                case Success(results) => {
+                    val allAlive = results.forall(_ == true)
+                    val reply = CanShutdownWorkerServerReply(canShutdownWorkerServer = allAlive)
+                    promise.trySuccess(reply)
+
+                    lock.synchronized{
+                        shutdownRequestIps.clear()
+                        globalCanshutdownPromise = None
+                    }
+                }
+                case Failure(_) => { // 그냥 기타 아무런 에러 나면, 그 하나의 stub 때문에 전체 canShutdown이 막힐 수 있어서 Failure 달아둠..
+                    val reply = CanShutdownWorkerServerReply(canShutdownWorkerServer = false)
+                    promise.trySuccess(reply)
+
+                    lock.synchronized{
+                        shutdownRequestIps.clear()
+                        globalCanshutdownPromise = None
+                    }
+                }
+            }
+        }
+
+        promise.future
+    }
 
 }
