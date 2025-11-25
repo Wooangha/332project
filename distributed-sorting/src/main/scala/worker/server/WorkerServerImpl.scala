@@ -9,6 +9,8 @@ import scala.jdk.CollectionConverters._
 import java.util.concurrent.ConcurrentHashMap
 import java.nio.file.{Files, Paths}
 import java.io.InputStream
+import com.google.protobuf.empty.Empty
+import scala.concurrent.Future
 
 class WorkerServerImpl(tempDir: String)
     extends WorkerServer {
@@ -22,25 +24,23 @@ class WorkerServerImpl(tempDir: String)
 
     private val lock = new Object
 
-    /** partition 완료 RPC */
-    override def setPartitionDone(
-        request: com.google.protobuf.empty.Empty,
-        responseObserver: StreamObserver[com.google.protobuf.empty.Empty]
-    ): Unit = lock.synchronized {
+   private def setPartitionDone(): Unit = {
 
-        println("[WorkerServer] Partitioning done")
+    println("[WorkerServer] Partition 완료됨 (internal)")
 
-        isPartitionDone = true
+    // partition 완료 표시
+    isPartitionDone = true
 
-        // 대기하던 모든 요청 처리
-        for ((ip, observer) <- waitingRequestForGetPartitionData.asScala) {
-            sendPartitionDataInternal(ip, observer)
-        }
-        waitingRequestForGetPartitionData.clear()
+    // 대기 중이던 getPartitionData 요청들 꺼내기
+    val pending = waitingRequestForGetPartitionData.asScala.toList
+    waitingRequestForGetPartitionData.clear()
 
-        responseObserver.onNext(com.google.protobuf.empty.Empty())
-        responseObserver.onCompleted()
+    // 각 대기 요청에게 파일 보내기
+    pending.foreach { case (ip, observer) =>
+        sendPartitionData(ip, observer)
     }
+}
+
 
     /** partition 요청 RPC */
     override def getPartitionData(
@@ -53,7 +53,7 @@ class WorkerServerImpl(tempDir: String)
 
         if (isPartitionDone) {
             println("[WorkerServer] Partition 끝! 즉시 전송")
-            sendPartitionDataInternal(ip, responseObserver)
+            sendPartitionData(ip, responseObserver)
         } else {
             println(s"[WorkerServer] Partition 미완료 → 대기 리스트로 저장: $ip")
             waitingRequestForGetPartitionData.put(ip, responseObserver)
@@ -61,20 +61,14 @@ class WorkerServerImpl(tempDir: String)
     }
 
     /** 서버 생존 체크 */
-    override def isAlive(
-        request: com.google.protobuf.empty.Empty,
-        responseObserver: StreamObserver[IsAliveReply]
-    ): Unit = {
+    override def isAlive(request: Empty): Future[IsAliveReply] = {
+    println("[WorkerServer] isAlive called")
+    Future.successful(IsAliveReply(isAlive = true))
+}
 
-        println("[WorkerServer] isAlive() 호출됨")
-
-        val reply = IsAliveReply(isAlive = true)
-        responseObserver.onNext(reply)
-        responseObserver.onCompleted()
-    }
 
     /** 내부 함수: 파일 스트리밍 */
-    private def sendPartitionDataInternal(
+    private def sendPartitionData(
         ip: String,
         responseObserver: StreamObserver[PartitionData]
     ): Unit = {
