@@ -3,7 +3,7 @@ import com.master.server.MasterServer.MasterServerGrpc
 
 import io.grpc.ManagedChannelBuilder
 import scala.concurrent.ExecutionContext
-import com.master.server.MasterServer.{WorkerInfo, RegisterReply}
+import com.master.server.MasterServer.{WorkerInfo, RegisterRequest, RegisterReply}
 
 object WorkerRegisterShuffleTestClient extends App {
     implicit val ec: ExecutionContext = ExecutionContext.global
@@ -24,19 +24,19 @@ object WorkerRegisterShuffleTestClient extends App {
     val bloc = MasterServerGrpc.blockingStub(channel)
 
     try {
-        // isShuffle = true → read-only 조회용
-        val reply: RegisterReply =
-        bloc.register(WorkerInfo(ip = ipArg, port = portArg, isShuffle = true))
+        val req = RegisterRequest(
+        workerInfo = Some(WorkerInfo(ip = ipArg, port = portArg)),
+        isShuffle = true     // 셔플용
+        )
+
+        val reply: RegisterReply = bloc.register(req)
 
         val verStr = reply.version.map(_.version).getOrElse(0)
         println(s"[ShuffleWorker] reply.version = $verStr")
-        println(s"[ShuffleWorker] worker list:")
-        reply.workerInfos.foreach { w =>
-        println(s"  - ${w.ip}:${w.port}")
-        }
+        reply.workerInfos.foreach { w => println(s"  - ${w.ip}:${w.port}") }
+
     } catch {
-        case e: Throwable =>
-        println(s"[ShuffleWorker] 실패...: ${e.getMessage}")
+        case e: Throwable => println(s"[ShuffleWorker] 실패...: ${e.getMessage}")
     } finally {
         channel.shutdown()
     }

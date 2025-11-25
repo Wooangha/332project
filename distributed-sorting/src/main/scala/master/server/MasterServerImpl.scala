@@ -1,5 +1,5 @@
 import com.master.server.MasterServer.MasterServerGrpc.MasterServer
-import com.master.server.MasterServer.{WorkerInfo, RegisterReply, Version, SampleKeyData, PartitionRanges, CanShutdownWorkerServerReply}
+import com.master.server.MasterServer.{WorkerInfo, RegisterRequest,RegisterReply, Version, SampleKeyData, PartitionRanges, Ip,CanShutdownWorkerServerReply}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -11,6 +11,7 @@ import scala.collection.mutable.ListBuffer // for watingRequestsForRegister
 
 import com.google.protobuf.ByteString
 import common.Key
+import com.master.server.MasterServer.RegisterRequest
 
 class MasterServerImpl extends MasterServer {
     val NUM_OF_WORKERS = 3
@@ -34,9 +35,10 @@ class MasterServerImpl extends MasterServer {
     //공용 lock 객체
     private val lock = new Object
 
-    def register(request: WorkerInfo): Future[RegisterReply] = {
-        val ip = request.ip
-        val port = request.port
+    def register(request: RegisterRequest): Future[RegisterReply] = {
+        val info = request.workerInfo.getOrElse{ throw new IllegalArgumentException("RegisterRequest.workerInfo is missing") }
+        val ip = info.ip
+        val port = info.port
         val isShuffle = request.isShuffle
 
         // lock 밖에서 사용될 애들
@@ -163,6 +165,6 @@ class MasterServerImpl extends MasterServer {
 
     // def getUpdatedWorkerInfo(request: Version): Future[WorkerInfo] = ???
 
-    def canShutdownWorkerServer(request: com.google.protobuf.empty.Empty): Future[CanShutdownWorkerServerReply] = ???
+    def canShutdownWorkerServer(request: Ip): Future[CanShutdownWorkerServerReply] = ???
 
 }
