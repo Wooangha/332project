@@ -27,7 +27,7 @@ class MasterServerImpl(numOfWorkers: Int, onMasterCanShutdown: () => Unit) exten
     // thread-safe하게 TrieMap으로 구현
     private val workerInfosMap: TrieMap[String, Int] = TrieMap.empty
 
-    // version 초기 값: 0, worker들이 write을 하지 않으니, 크게 cose 상관 없을 듯하여 atomic 변수로 선언
+    // version 초기 값: 0, worker들이 write을 하지 않으니, 크게 상관 없을 듯하여 atomic 변수로 선언
     private val currentVersion = new AtomicInteger(0)
 
     private val waitingRequestsForRegister: ListBuffer[Promise[RegisterReply]] = ListBuffer.empty
