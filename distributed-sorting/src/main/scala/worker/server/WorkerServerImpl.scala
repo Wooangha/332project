@@ -6,14 +6,14 @@ import com.google.protobuf.ByteString
 
 import io.grpc.stub.StreamObserver
 import scala.jdk.CollectionConverters._
-import java.util.concurrent.ConcurrentHashMap
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Paths, DirectoryStream}
 import java.io.InputStream
 import com.google.protobuf.empty.Empty
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class WorkerServerImpl(tempDir: String)
-    extends WorkerServer {
+class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
     @volatile
     private var isPartitionDone: Boolean = false
@@ -60,28 +60,42 @@ class WorkerServerImpl(tempDir: String)
     /** 서버 생존 체크 */
     override def isAlive(request: Empty): Future[IsAliveReply] = {
         println("[WorkerServer] isAlive called")
-        Future.successful(IsAliveReply(isAlive = true))
+        val reply = IsAliveReply(isAlive = true, isDone = isPartitionDone)
+        Future.successful(reply)
+       
         }
 
 
     /** 내부 함수: 파일 스트리밍 */
     private def sendPartitionData(ip: String,responseObserver: StreamObserver[PartitionData]): Unit = {
+        Future{
+        val filePath = Paths.get(tempDir)
+        var foundFile: java.nio.file.Path = null
+        var stream: DirectoryStream[java.nio.file.Path] = null
 
-        val filePath = Paths.get(tempDir, s"$ip-partition.bin")
-
-        if (!Files.exists(filePath)) {
-            
-            println(s"[WorkerServer] ERROR: partition 파일 없음: $filePath")
-            responseObserver.onError(new RuntimeException(s"No partition file for ip=$ip"))
-            return
+        try {
+            stream = Files.newDirectoryStream(filePath,s"$ip-*")
+            val iterator = stream.iterator()
+            if(iterator.hasNext){
+                foundFile = iterator.next()
+        }} catch {
+            case e: Exception =>
+                println(s"[WorkerServer] ERROR: 파일 검색 중 에러: $ip")
+        } finally {
+            if (stream != null) stream.close()
         }
 
-        println(s"[WorkerServer] partition 파일 스트리밍 시작: $filePath")
+        if (foundFile == null||!Files.exists(foundFile)) {
+            
+            println(s"[WorkerServer] ERROR: partition 파일 없음: $foundFile")
+            responseObserver.onError(new RuntimeException(s"No partition file for ip=$ip"))
+        }else{
+        println(s"[WorkerServer] partition 파일 스트리밍 시작: $foundFile")
 
         var in: InputStream = null
 
         try {
-            in = Files.newInputStream(filePath)
+            in = Files.newInputStream(foundFile)
             val buffer = new Array[Byte](100)
 
             var read = in.read(buffer)
@@ -98,4 +112,6 @@ class WorkerServerImpl(tempDir: String)
                 responseObserver.onError(e)} 
         finally {if (in != null) in.close()}
     }
+    }
+}
 }
