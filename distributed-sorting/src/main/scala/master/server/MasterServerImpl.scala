@@ -21,16 +21,18 @@ import com.worker.server.WorkerServer.WorkerSeverGrpc
 import com.google.protobuf.empty.Empty
 import scala.concurrent.blocking
 
-class MasterServerImpl(numOfWorkers: Int) extends MasterServer {
+class MasterServerImpl(numOfWorkers: Int, onMasterCanShutdown: () => Unit) extends MasterServer {
 
     ////// for register ///////
     // thread-safe하게 TrieMap으로 구현
     private val workerInfosMap: TrieMap[String, Int] = TrieMap.empty
 
-    // version 초기 값: 0, worker들이 write을 하지 않으니, 크게 cose 상관 없을 듯하여 atomic 변수로 선언
+    // version 초기 값: 0, worker들이 write을 하지 않으니, 크게 상관 없을 듯하여 atomic 변수로 선언
     private val currentVersion = new AtomicInteger(0)
 
     private val waitingRequestsForRegister: ListBuffer[Promise[RegisterReply]] = ListBuffer.empty
+
+    private var workerIpsPrinted: Boolean = false // 워커들 ip 출력 했는 지 여부
 
 
     ////// for getPartitionRange ///////
@@ -66,11 +68,18 @@ class MasterServerImpl(numOfWorkers: Int) extends MasterServer {
 
                 RegisterReply(workerInfos = workerList, version = Some(Version(version = replyVersion)))
             }
-
+            
             if(!isShuffle){ // 처음 등록 용 register
                 workerInfosMap += (ip -> port)
 
                 val newVersion = currentVersion.incrementAndGet()
+
+                //워커들 ip 한 번 출력
+                if (!workerIpsPrinted && workerInfosMap.size == numOfWorkers) {
+                    val ips = workerInfosMap.keys.toSeq.sorted.mkString(", ")
+                    println(ips)
+                    workerIpsPrinted = true
+                }
 
                 if(workerInfosMap.size < numOfWorkers){
                     val p = Promise[RegisterReply]()
@@ -222,9 +231,13 @@ class MasterServerImpl(numOfWorkers: Int) extends MasterServer {
             }
             checksF.onComplete{
                 case Success(results) => {
-                    val allAlive = results.forall(_ == true)
-                    val reply = CanShutdownWorkerServerReply(canShutdownWorkerServer = allAlive)
+                    val allAliveAndAllDone = results.forall(_ == true)
+                    val reply = CanShutdownWorkerServerReply(canShutdownWorkerServer = allAliveAndAllDone)
                     promise.trySuccess(reply)
+
+                    if(allAliveAndAllDone) { // 모든 워커들 닫게 되면 마스터도 서버 닫는 신호 보내기
+                        onMasterCanShutdown()
+                    }
 
                     lock.synchronized{
                         shutdownRequestIps.clear()
