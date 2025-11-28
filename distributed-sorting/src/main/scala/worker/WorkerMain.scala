@@ -42,9 +42,12 @@ object WorkerMain extends App {
     Files.createDirectories(Paths.get(outputDirs))
 
     // ----------------- 1. 워커 서버 시작 -----------------
+
+    val workerServiceImpl = new WorkerServerImpl(DataProcessor.tempDirPrefix)
+
     val workerServer = NettyServerBuilder
         .forPort(0)                 // OS가 포트 할당
-        .addService(WorkerServerGrpc.bindService(new WorkerServerImpl(DataProcessor.tempDirPrefix), ec))
+        .addService(WorkerServerGrpc.bindService(workerServiceImpl, ec))
         .build().start()
     
     val workerPort = workerServer.getPort
@@ -79,7 +82,6 @@ object WorkerMain extends App {
         }
 
         // ----------------- 4. 샘플링 + getPartitionRange -----------------
-
         val sampleSize = 10000
 
         // 비동기 처리 맞는지?
@@ -105,20 +107,60 @@ object WorkerMain extends App {
 
         println(s"[Worker] received ${partitionRangesKey.size} partition ranges")
 
+        // ----------------- 5. 파티션 함수 생성 -----------------
+        val workerIpList: List[String] = 
+            workerInfos.map(_.ip).toList
+        
+        val partitionFunc: Key => String = Util.makePartition(partitionRangesKey, workerIpList)
+
+        // ----------------- 6. 로컬 sort + partitioning -----------------
+        println("[Worker] sort and partitioning local data start")
+
+        val partitionedDirsF: Future[List[String]] = 
+            DataProcessor.sortAndPartitioning(inputDirs.toList, partitionFunc)
+        
+        val partitionedDirs: List[String] = Await.result(partitionedDirsF, Duration.Inf)
+
+        println("[Worker] local sort+partitioning done. Notify worker-server that partitions are ready.")
+        workerServiceImpl.setPartitionDone()
+
+        // ----------------- 7. 셔플 단계: 다른 워커에게서 우리 파티션 받기 -----------------
+
+        // ----------------- 8. 머지 + 최종 출력 -----------------
+        
+        // ----------------- 9. WorkerServerImpl 에 '끝났다' 표시 -----------------
+
+        //workerServerImpl.markDone() -> 워커 서버에서 구현되면 그때 주석 풀게요.
+        
+        // ----------------- 10. canShutdownWorkerServer 루프 -----------------
+        println("[Worker] asking master whether I can shutdown")
+
+        val myIpMsg = com.master.server.MasterServer.Ip(ip = workerIp)
+
+        var canShutdown = false
+        while(!canShutdown) {
+            val reply: CanShutdownWorkerServerReply = masterbloc.canShutdownWorkerServer(myIpMsg)
+
+            if(reply.canShutdownWorkerServer) {
+                println("[Worker] master says I can shutdown. Exiting.")
+                canShutdown = true
+            } else {
+                println("[Worker] master says not yet. Will retry...")
+
+                // 일단은 시간 걸어둠. 어차피 웨리포에 담겨서 굳이긴 한데..
+                Thread.sleep(3000)
+            }
+        }
 
 
     } finally {
-        // 채널/서버 정리
+        // 위에서 오류가 쳐 나든 말든 일단 채널/서버 정리하기
         masterChannel.shutdown()
         workerServer.shutdown()
         workerServer.awaitTermination()
     }
 
-
-
-
-
-
+    // below for helper functions
 
     // args: '-I d1 d2 ... -O outDir' 형태를 파싱하는 함수(by GPT)
     private def parseIOArgs(rest: Array[String]): (List[String], String) = {

@@ -21,7 +21,7 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
     private val lock = new Object
 
-    private def setPartitionDone(): Unit = {
+    def setPartitionDone(): Unit = {
 
         
         val pending = lock.synchronized {
