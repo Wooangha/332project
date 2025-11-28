@@ -101,7 +101,7 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
         try {
             in = Files.newInputStream(foundFile)
-            val buffer = new Array[Byte](100)
+            val buffer = new Array[Byte](100000)  // 0.1MB 버퍼
 
             var read = in.read(buffer)
             while (read != -1) {
