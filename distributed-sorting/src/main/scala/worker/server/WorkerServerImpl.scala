@@ -1,6 +1,4 @@
-package com.worker.server
-
-import com.worker.server.WorkerServerGrpc.WorkerServer
+import com.worker.server.WorkerServer.WorkerServerGrpc.WorkerServer
 import com.worker.server.WorkerServer.{Ip, PartitionData, IsAliveReply}
 import com.google.protobuf.ByteString
 
@@ -17,13 +15,20 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
     @volatile
     private var isPartitionDone: Boolean = false
+    @volatile
+    private var isDone: Boolean = false
+
+    def markDone(): Unit = {
+        isDone = true
+        println("[WorkerServer] 모든 작업 완료")
+    }
 
     // IP → partition 요청 확인
     private val waitingRequestForGetPartitionData = new ConcurrentHashMap[String, StreamObserver[PartitionData]]()
 
     private val lock = new Object
 
-    private def setPartitionDone(): Unit = {
+    def setPartitionDone(): Unit = {
 
         
         val pending = lock.synchronized {
@@ -60,7 +65,7 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
     /** 서버 생존 체크 */
     override def isAlive(request: Empty): Future[IsAliveReply] = {
         println("[WorkerServer] isAlive called")
-        val reply = IsAliveReply(isAlive = true, isDone = isPartitionDone)
+        val reply = IsAliveReply(isAlive = true, isDone = this.isDone)
         Future.successful(reply)
        
         }
