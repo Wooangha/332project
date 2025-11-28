@@ -17,7 +17,7 @@ message IsAliveReply {
   bool isDone = 2;
 }
 
-service WorkerSever {
+service WorkerServer {
   // TODO: is it rpc?
   // rpc setPartitionDone (google.protobuf.Empty) returns (google.protobuf.Empty);
   rpc getPartitionData (Ip) returns (stream PartitionData);
