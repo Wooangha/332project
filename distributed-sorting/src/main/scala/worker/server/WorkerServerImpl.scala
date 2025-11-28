@@ -15,6 +15,13 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
     @volatile
     private var isPartitionDone: Boolean = false
+    @volatile
+    private var isDone: Boolean = false
+
+    def markDone(): Unit = {
+        isDone = true
+        println("[WorkerServer] 모든 작업 완료")
+    }
 
     // IP → partition 요청 확인
     private val waitingRequestForGetPartitionData = new ConcurrentHashMap[String, StreamObserver[PartitionData]]()
@@ -58,7 +65,7 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
     /** 서버 생존 체크 */
     override def isAlive(request: Empty): Future[IsAliveReply] = {
         println("[WorkerServer] isAlive called")
-        val reply = IsAliveReply(isAlive = true, isDone = isPartitionDone)
+        val reply = IsAliveReply(isAlive = true, isDone = this.isDone)
         Future.successful(reply)
        
         }
@@ -94,7 +101,7 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
         try {
             in = Files.newInputStream(foundFile)
-            val buffer = new Array[Byte](100)
+            val buffer = new Array[Byte](100000)  // 0.1MB 버퍼
 
             var read = in.read(buffer)
             while (read != -1) {

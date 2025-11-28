@@ -42,8 +42,7 @@ object WorkerMain extends App {
     Files.createDirectories(Paths.get(outputDirs))
 
     // ----------------- 1. 워커 서버 시작 -----------------
-
-    val workerServiceImpl = new WorkerServerImpl(DataProcessor.tempDirPrefix)
+    val workerServiceImpl = new WorkerServerImpl(DataProcessor.tempDirPrefix) // Q.인자 이거 맞음?
 
     val workerServer = NettyServerBuilder
         .forPort(0)                 // OS가 포트 할당
@@ -125,12 +124,47 @@ object WorkerMain extends App {
         workerServiceImpl.setPartitionDone()
 
         // ----------------- 7. 셔플 단계: 다른 워커에게서 우리 파티션 받기 -----------------
+        println("[Worker] shuffle: fetching my partitions from all workers")
+
+        val myIp = workerIp
+
+        val remotePartitionFilesF: Future[List[String]] = fetchAllPartitionsForMe(
+            myIp = myIp,
+            workers = workerInfos,
+            outputDir = outputDirs
+        )
+
+        val remotePartitionFiles: List[String] = Await.result(remotePartitionFilesF, Duration.Inf)
+
+        println(s"[Worker] shuffle done. Collected ${remotePartitionFiles.size} temp files for my partitions")
 
         // ----------------- 8. 머지 + 최종 출력 -----------------
-        
+        var partIdx = 0
+        def makeOutputDir(): String = {
+            val path = Paths.get(outputDirs, s"partition.$partIdx")
+            partIdx += 1
+            path.toString()
+        }
+
+        // 하나의 출력 파일에 몇 개 레코드까지 넣을지 -> 추후 조정 필요
+        val maxRecordsPerFile = 320000
+
+        println("[Worker] merging collected partitions into final output files")
+
+        DataProcessor.merge(
+            dataDirLs = remotePartitionFiles,
+            makeNewDir = makeOutputDir,
+            maxSize = maxRecordsPerFile
+        )
+
+        println("[Worker] merge done. Final outputs:")
+        (0 until partIdx).foreach { i =>
+            println(s"  - ${Paths.get(outputDirs, s"partition.$i")}")
+        }
+
         // ----------------- 9. WorkerServerImpl 에 '끝났다' 표시 -----------------
 
-        //workerServerImpl.markDone() -> 워커 서버에서 구현되면 그때 주석 풀게요.
+        workerServiceImpl.markDone()
         
         // ----------------- 10. canShutdownWorkerServer 루프 -----------------
         println("[Worker] asking master whether I can shutdown")
@@ -212,6 +246,59 @@ object WorkerMain extends App {
         }
         .getOrElse(InetAddress.getLocalHost.getHostAddress)
     }
+    
+    /*  below helper function is created by GPT
+        1.	모든 워커에서 “나에게 속한” 파티션 조각들을 받아와서
+        2.	remotePartitionFiles 리스트에 담고
+        3.	그걸 merge 해서 최종 정렬된 결과를 여러 개의 output 파일로 쓰는 단계야.
+     */
+    private def fetchAllPartitionsForMe(
+        myIp: String,
+        workers: Seq[WorkerInfo],
+        outputDir: String
+    ): Future[List[String]] = {
+        val futures = workers.map { wInfo =>
+            Future {
+                val ip   = wInfo.ip
+                val port = wInfo.port
 
+                val tmpPath = Paths.get(outputDir, s"shuffle_from_${sanitize(ip)}_$port").toString
+
+                println(s"[Worker] fetching partition for $myIp from $ip:$port -> $tmpPath")
+
+                val channel = ManagedChannelBuilder
+                    .forAddress(ip, port)
+                    .usePlaintext()
+                    .build()
+
+                try {
+                val stub = WorkerServerGrpc.blockingStub(channel)
+
+                val req  = com.worker.server.WorkerServer.Ip(ip = myIp)
+                val it   = stub.getPartitionData(req) // blocking iterator
+
+                // 여기서는 단순히 받은 바이트를 그대로 파일에 써 둠
+                val out = java.nio.file.Files.newOutputStream(Paths.get(tmpPath))
+                try {
+                    while (it.hasNext) {
+                        val partData = it.next()
+                        val bytes = partData.data.toByteArray
+                        out.write(bytes)
+                    }
+                } finally {
+                    out.close()
+                }
+
+                tmpPath
+                } finally {
+                    channel.shutdown()
+                }
+            }
+        }
+
+    Future.sequence(futures).map(_.toList)
+    }
+
+    private def sanitize(ip: String): String = ip.replace(":", "_").replace(".", "_")
     
 }
