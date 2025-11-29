@@ -25,6 +25,10 @@ import com.master.server.MasterServer.MasterServerGrpc
 import com.worker.server.WorkerServer._
 import com.worker.server.WorkerServer.WorkerServerGrpc
 
+//below for shuffle stage(fault-tolerance)
+import java.util.concurrent.TimeUnit
+import io.grpc.StatusRuntimeException
+
 object WorkerMain extends App {
     implicit val ec: ExecutionContext = ExecutionContext.global
 
@@ -71,12 +75,13 @@ object WorkerMain extends App {
 
         val initReply: RegisterReply = masterbloc.register(initReq)
 
-        val version0 = initReply.version.map(_.version).getOrElse(0)
-        val workerInfos: Seq[WorkerInfo] = initReply.workerInfos
+        var currentVersion = initReply.version.map(_.version).getOrElse(0)
+        var currentWorkerInfos: Seq[WorkerInfo] = initReply.workerInfos
+        val myWorkerInfo: WorkerInfo = WorkerInfo(ip = workerIp, port = workerPort)
 
-        println(s"[Worker] registered. version=$version0")
+        println(s"[Worker] registered. version=$currentVersion")
         println("[Worker] worker list from master:")
-        workerInfos.foreach { w =>
+        currentWorkerInfos.foreach { w =>
             println(s"  - ${w.ip}:${w.port}")
         }
 
@@ -108,7 +113,7 @@ object WorkerMain extends App {
 
         // ----------------- 5. 파티션 함수 생성 -----------------
         val workerIpList: List[String] = 
-            workerInfos.map(_.ip).toList
+            currentWorkerInfos.map(_.ip).toList
         
         val partitionFunc: Key => String = Util.makePartition(partitionRangesKey, workerIpList)
 
@@ -130,8 +135,11 @@ object WorkerMain extends App {
 
         val remotePartitionFilesF: Future[List[String]] = fetchAllPartitionsForMe(
             myIp = myIp,
-            workers = workerInfos,
-            outputDir = outputDirs
+            myWorkerInfo = myWorkerInfo,
+            outputDir = outputDirs,
+            masterStub = masterbloc,
+            initialWorkers = currentWorkerInfos,
+            initialVersion = currentVersion
         )
 
         val remotePartitionFiles: List[String] = Await.result(remotePartitionFilesF, Duration.Inf)
@@ -251,52 +259,123 @@ object WorkerMain extends App {
         1.	모든 워커에서 “나에게 속한” 파티션 조각들을 받아와서
         2.	remotePartitionFiles 리스트에 담고
         3.	그걸 merge 해서 최종 정렬된 결과를 여러 개의 output 파일로 쓰는 단계야.
-     */
+     */ // gpt가 일단 셔플 관련 로직으로 코드 먼저 생성하고, 내가 추가로 타임 아웃 + 에러 감지로 튜닝 업글 해봄
     private def fetchAllPartitionsForMe(
         myIp: String,
-        workers: Seq[WorkerInfo],
-        outputDir: String
+        myWorkerInfo: WorkerInfo,
+        outputDir: String,
+        masterStub: MasterServerGrpc.MasterServerBlockingStub,
+        initialWorkers: Seq[WorkerInfo],
+        initialVersion: Int
     ): Future[List[String]] = {
-        val futures = workers.map { wInfo =>
+        // 어떤 ip들 한테서 받아야 하는지(지 자신도 포함임 -> 추후 최적화 해도 될 듯)
+        val targetIps: Seq[String] = initialWorkers.map(_.ip).distinct
+
+        // 각 ip 별로 병렬 셔플 + 재시도
+        val perIpFutures: Seq[Future[String]] = targetIps.map { targetIp =>
             Future {
-                val ip   = wInfo.ip
-                val port = wInfo.port
+                var curWorkers: Seq[WorkerInfo] = initialWorkers
+                var curVersion: Int = initialVersion
 
-                val tmpPath = Paths.get(outputDir, s"shuffle_from_${sanitize(ip)}_$port").toString
+                def refreshFromMaster(): Unit = {
+                    println(s"[Worker] shuffle-register for targetIp=$targetIp")
+                    
+                    val req = RegisterRequest(
+                        workerInfo = Some(myWorkerInfo),
+                        isShuffle = true
+                    )
+                    val reply = masterStub.register(req)
 
-                println(s"[Worker] fetching partition for $myIp from $ip:$port -> $tmpPath")
-
-                val channel = ManagedChannelBuilder
-                    .forAddress(ip, port)
-                    .usePlaintext()
-                    .build()
-
-                try {
-                val stub = WorkerServerGrpc.blockingStub(channel)
-
-                val req  = com.worker.server.WorkerServer.Ip(ip = myIp)
-                val it   = stub.getPartitionData(req) // blocking iterator
-
-                // 여기서는 단순히 받은 바이트를 그대로 파일에 써 둠
-                val out = java.nio.file.Files.newOutputStream(Paths.get(tmpPath))
-                try {
-                    while (it.hasNext) {
-                        val partData = it.next()
-                        val bytes = partData.data.toByteArray
-                        out.write(bytes)
+                    val newVer = reply.version.map(_.version).getOrElse(curVersion)
+                    if(newVer != curVersion) {
+                        println(s"[Worker] version updated $curVersion -> $newVer")
+                        curVersion = newVer
+                    } else {
+                        println(s"[Worker] version unchanged = $curVersion")
                     }
-                } finally {
-                    out.close()
+
+                    curWorkers = reply.workerInfos
                 }
 
-                tmpPath
-                } finally {
-                    channel.shutdown()
+                def findWorker(ip: String): Option[WorkerInfo] = 
+                    curWorkers.find(_.ip == ip)
+                
+                def fetchOnceFromWorker(target: WorkerInfo): Either[Throwable, String] = {
+                    val ip = target.ip
+                    val port = target.port
+
+                    val tmpPath = Paths.get(outputDir, s"shuffle_from_${sanitize(ip)}_$port").toString
+
+                    println(s"[Worker] try fetch partition for $myIp from $ip:$port -> $tmpPath")
+
+                    val channel = ManagedChannelBuilder
+                        .forAddress(ip, port)
+                        .usePlaintext()
+                        .build()
+                    
+                    try {
+                        val stub = WorkerServerGrpc
+                            .blockingStub(channel)
+                            .withDeadlineAfter(10, TimeUnit.SECONDS) // silent-hang 방지용인데, 시간 이거 좀 적절히 조절해야 할 듯?
+                        
+                        val req = com.worker.server.WorkerServer.Ip(ip = myIp)
+                        val it = stub.getPartitionData(req) // blocking iterator
+
+                        val outPath = Paths.get(tmpPath)
+                        val out = java.nio.file.Files.newOutputStream(outPath)
+                        try {
+                            while (it.hasNext) {
+                                val partData = it.next()
+                                out.write(partData.data.toByteArray)
+                            }
+                        } finally {
+                            out.close()
+                        }
+
+                        println(s"[Worker] fetch from $ip:$port succeed")
+                        Right(tmpPath)
+
+                    } catch {
+                        case e: Throwable =>
+                            /* 반쯤 받은 파일은 다음 시도를 위해 삭제하는 방식의 코드
+                            try java.nio.file.Files.deleteIfExists(Paths.get(tmpPath))
+                            catch { case _: Throwable => () }
+                            */
+                            e match {
+                                case sre: StatusRuntimeException => // grpc 에러만 따로 골라 잡기 히히
+                                    println(s"[Worker] gRPC error from $ip:$port - status=${sre.getStatus}, desc=${sre.getMessage}")
+                                case other =>
+                                    println(s"[Worker] unexpected error from $ip:$port - ${other.getClass.getSimpleName}: ${other.getMessage}")
+                            }
+                            Left(e)
+                    } finally {
+                        channel.shutdown()
+                    }
                 }
+
+                var done = false
+                var lastPath: Option[String] = None
+
+                while (!done) {
+                    val targetWorker = findWorker(targetIp)
+
+                    fetchOnceFromWorker(targetWorker.get) match {
+                        case Right(path) => 
+                            lastPath = Some(path)
+                            done = true
+
+                        case Left(_) =>
+                            println(s"[Worker] fetch from ${targetWorker.get.ip}:${targetWorker.get.port} failed. " + s"register(isShuffle=true) 후 재시도.")
+                            refreshFromMaster()
+                            Thread.sleep(1000L)
+                    }
+                }
+
+                lastPath.get
             }
         }
 
-    Future.sequence(futures).map(_.toList)
+        Future.sequence(perIpFutures).map(_.toList)
     }
 
     private def sanitize(ip: String): String = ip.replace(":", "_").replace(".", "_")
