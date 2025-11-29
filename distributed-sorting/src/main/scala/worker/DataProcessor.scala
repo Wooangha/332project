@@ -24,8 +24,12 @@ object DataProcessor {
     while (nowSampleSize < sampleSize && dataDirIterator.hasNext) {
       val dir = dataDirIterator.next()
       val data = Data.fromFile(dir)
-      nowSampleSize += data.data.length
-      result ++= data.data.map(_.key)
+      
+      val dataSize = data.data.length
+      val takeSize = Math.min(sampleSize - nowSampleSize, dataSize)
+      nowSampleSize += takeSize
+
+      result ++= data.data.take(takeSize).map(_.key)
     }
 
     result
