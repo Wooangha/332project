@@ -46,8 +46,12 @@ object WorkerMain extends App {
     Files.createDirectories(Paths.get(outputDirs))
 
     // ----------------- 1. 워커 서버 시작 -----------------
-    val workerServiceImpl = new WorkerServerImpl(DataProcessor.tempDirPrefix) // Q.인자 이거 맞음?
+    val myTempDir = Paths.get(outputDirs).getParent.resolve("tmp").toString
+    Files.createDirectories(Paths.get(myTempDir))
 
+    println(s"[Worker] Created temporary directory: $myTempDir")
+   
+    val workerServiceImpl = new WorkerServerImpl(myTempDir)
     val workerServer = NettyServerBuilder
         .forPort(0)                 // OS가 포트 할당
         .addService(WorkerServerGrpc.bindService(workerServiceImpl, ec))
@@ -55,6 +59,7 @@ object WorkerMain extends App {
     
     val workerPort = workerServer.getPort
     val workerIp = getMyIp
+    //val workerIp = s"127.0.0.${workerPort % 250 + 1}"   // 로컬 테스트용
 
     // ----------------- 2. 마스터 채널 / 스텁 -----------------
     val masterChannel = ManagedChannelBuilder
@@ -121,7 +126,7 @@ object WorkerMain extends App {
         println("[Worker] sort and partitioning local data start")
 
         val partitionedDirsF: Future[List[String]] = 
-            DataProcessor.sortAndPartitioning(inputDirs.toList, partitionFunc)
+            DataProcessor.sortAndPartitioning(inputDirs.toList, partitionFunc, myTempDir)
         
         val partitionedDirs: List[String] = Await.result(partitionedDirsF, Duration.Inf)
 
@@ -302,8 +307,8 @@ object WorkerMain extends App {
                 
                 def fetchOnceFromWorker(target: WorkerInfo): Either[Throwable, String] = {
                     val ip = target.ip
+                    //val ip = "127.0.0.1" // 로컬 테스트용 
                     val port = target.port
-
                     val tmpPath = Paths.get(outputDir, s"shuffle_from_${sanitize(ip)}_$port").toString
 
                     println(s"[Worker] try fetch partition for $myIp from $ip:$port -> $tmpPath")
