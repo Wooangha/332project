@@ -272,7 +272,7 @@ object WorkerMain extends App {
         val targetIps: Seq[String] = initialWorkers.map(_.ip).distinct
 
         // 각 ip 별로 병렬 셔플 + 재시도
-        val perIpFutures: Seq[Future[String]] = targetIps.map { targetIp =>
+        val perIpFutures: Seq[Future[List[String]]] = targetIps.map { targetIp =>
             Future {
                 var curWorkers: Seq[WorkerInfo] = initialWorkers
                 var curVersion: Int = initialVersion
@@ -300,13 +300,17 @@ object WorkerMain extends App {
                 def findWorker(ip: String): Option[WorkerInfo] = 
                     curWorkers.find(_.ip == ip)
                 
-                def fetchOnceFromWorker(target: WorkerInfo): Either[Throwable, String] = {
+                def fetchOnceFromWorker(target: WorkerInfo): Either[Throwable, List[String]] = {
                     val ip = target.ip
                     val port = target.port
 
-                    val tmpPath = Paths.get(outputDir, s"shuffle_from_${sanitize(ip)}_$port").toString
+                    var cnt = 0
+                    def makeTmpPath(): String = {
+                      cnt += 1
+                      Paths.get(outputDir, s"shuffle_from_${ip}_$port-$cnt").toString
+                    }
 
-                    println(s"[Worker] try fetch partition for $myIp from $ip:$port -> $tmpPath")
+                    println(s"[Worker] try fetch partition for $myIp from $ip:$port")
 
                     val channel = ManagedChannelBuilder
                         .forAddress(ip, port)
@@ -321,19 +325,21 @@ object WorkerMain extends App {
                         val req = com.worker.server.WorkerServer.Ip(ip = myIp)
                         val it = stub.getPartitionData(req) // blocking iterator
 
-                        val outPath = Paths.get(tmpPath)
-                        val out = java.nio.file.Files.newOutputStream(outPath)
-                        try {
-                            while (it.hasNext) {
-                                val partData = it.next()
+                        var savePaths = List[String]()
+                        for (partData <- it) {
+                            val tmpPath = makeTmpPath()
+                            val outPath = Paths.get(tmpPath)
+                            savePaths = tmpPath :: savePaths
+                            val out = java.nio.file.Files.newOutputStream(outPath)
+                            try {
                                 out.write(partData.data.toByteArray)
+                            } finally {
+                                out.close()
                             }
-                        } finally {
-                            out.close()
                         }
 
                         println(s"[Worker] fetch from $ip:$port succeed")
-                        Right(tmpPath)
+                        Right(savePaths)
 
                     } catch {
                         case e: Throwable =>
@@ -354,7 +360,7 @@ object WorkerMain extends App {
                 }
 
                 var done = false
-                var lastPath: Option[String] = None
+                var lastPath: Option[List[String]] = None
 
                 while (!done) {
                     val targetWorker = findWorker(targetIp)
@@ -375,7 +381,7 @@ object WorkerMain extends App {
             }
         }
 
-        Future.sequence(perIpFutures).map(_.toList)
+        Future.sequence(perIpFutures).map(_.toList.flatten)
     }
 
     private def sanitize(ip: String): String = ip.replace(":", "_").replace(".", "_")
