@@ -2,14 +2,18 @@ syntax = "proto3";
 
 package com.master.server;
 
-import "google/protobuf/empty.proto";
-
 message WorkerInfo {
   string ip = 1;
   uint32 port = 2;
 }
+
 message Version {
   uint32 version = 1;
+}
+
+message RegisterRequest{
+  WorkerInfo workerInfo = 1;
+  bool isShuffle = 2;
 }
 
 message RegisterReply {
@@ -35,13 +39,17 @@ message PartitionRanges {
   repeated PartitionRange PartitionRanges = 1;
 }
 
+message Ip {
+  string ip = 1;
+}
+
 message CanShutdownWorkerServerReply {
   bool canShutdownWorkerServer = 1;
 }
 
 service MasterServer {
-  rpc register (WorkerInfo) returns (RegisterReply);
+  rpc register (RegisterRequest) returns (RegisterReply);
   rpc getPartitionRange (SampleKeyData) returns (PartitionRanges);
-  rpc getUpdatedWorkerInfo (Version) returns (WorkerInfo);
-  rpc canShutdownWorkerServer (google.protobuf.Empty) returns (CanShutdownWorkerServerReply);
+  // rpc getUpdatedWorkerInfo (Version) returns (WorkerInfo);
+  rpc canShutdownWorkerServer (Ip) returns (CanShutdownWorkerServerReply);
 }
