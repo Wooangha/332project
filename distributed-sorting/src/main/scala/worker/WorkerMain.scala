@@ -136,7 +136,6 @@ object WorkerMain extends App {
         val remotePartitionFilesF: Future[List[String]] = fetchAllPartitionsForMe(
             myIp = myIp,
             myWorkerInfo = myWorkerInfo,
-            outputDir = outputDirs,
             masterStub = masterbloc,
             initialWorkers = currentWorkerInfos,
             initialVersion = currentVersion
@@ -263,7 +262,6 @@ object WorkerMain extends App {
     private def fetchAllPartitionsForMe(
         myIp: String,
         myWorkerInfo: WorkerInfo,
-        outputDir: String,
         masterStub: MasterServerGrpc.MasterServerBlockingStub,
         initialWorkers: Seq[WorkerInfo],
         initialVersion: Int
@@ -307,7 +305,9 @@ object WorkerMain extends App {
                     var cnt = 0
                     def makeTmpPath(): String = {
                       cnt += 1
-                      Paths.get(outputDir, s"shuffle_from_${ip}_$port-$cnt").toString
+                      Paths.get(
+                        DataProcessor.tempDirPrefix,
+                        s"shuffle_from_${ip}_$port-$cnt").toString
                     }
 
                     println(s"[Worker] try fetch partition for $myIp from $ip:$port")
