@@ -82,7 +82,7 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
                 val filesToStream = stream.iterator().asScala.toList.sortBy(_.getFileName.toString) 
                 
                 if (filesToStream.isEmpty) {
-                    println(s"[WorkerServer] ERROR: no partition files for ip=$ip")
+                    println(s"[WorkerServer] no partition files for ip=$ip")
                     responseObserver.onCompleted()
                 } else {
                     println(s"[WorkerServer] streaming ${filesToStream.size} files for $ip")
