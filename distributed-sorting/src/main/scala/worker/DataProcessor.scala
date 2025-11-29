@@ -32,23 +32,14 @@ object DataProcessor {
 
     val dataLoadLs = for ((inputDir, numOfData) <- dataDirLs.zip(0 until dataDirLs.length))
       yield Future {
-        (numOfData, Data.fromFile(inputDir).sort().partitioning(partition))
-      }
-
-    val savedDataLoadLs = dataLoadLs.map { dataLoad =>
-      dataLoad.flatMap { case (numOfData, data) =>
-        val saveFutures = for ((ip, partData) <- data) yield Future {
+        Data.fromFile(inputDir).sort().partitioning(partition).map { case (ip, partData) =>
           val saveDir = s"${tempDirPrefix}${ip}-${numOfData.toString}"
           partData.save(saveDir)
           saveDir
         }
-        Future.sequence(saveFutures)
       }
-    }
 
-    Future.sequence(savedDataLoadLs).flatMap { dirsLis =>
-      Future.successful(dirsLis.flatten)
-    }
+    Future.sequence(dataLoadLs).map(_.flatten)
   }
 
   def removeTempDir(): Unit = {
