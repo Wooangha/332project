@@ -384,6 +384,4 @@ object WorkerMain extends App {
         Future.sequence(perIpFutures).map(_.toList.flatten)
     }
 
-    private def sanitize(ip: String): String = ip.replace(":", "_").replace(".", "_")
-    
 }
