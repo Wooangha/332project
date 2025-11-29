@@ -83,7 +83,7 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
                 
                 if (filesToStream.isEmpty) {
                     println(s"[WorkerServer] ERROR: no partition files for ip=$ip")
-                    responseObserver.onError(new RuntimeException(s"No partition file for ip=$ip"))
+                    responseObserver.onCompleted()
                 } else {
                     println(s"[WorkerServer] streaming ${filesToStream.size} files for $ip")
 
