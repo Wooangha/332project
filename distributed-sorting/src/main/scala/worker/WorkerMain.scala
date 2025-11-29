@@ -199,7 +199,7 @@ object WorkerMain extends App {
         masterChannel.shutdown()
         workerServer.shutdown()
         workerServer.awaitTermination()
-        DataProcessor.removeTempDir(myTempDir)
+        DataProcessor.removeTempDir()
     }
 
     // below for helper functions
