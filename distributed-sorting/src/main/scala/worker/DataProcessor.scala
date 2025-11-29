@@ -15,15 +15,20 @@ object DataProcessor {
 
   def sampling(
       dataDirLs: List[String],
-      sampleSize: Int): Future[Array[Key]] = {
-    val sampleSizePerFile = Math.ceil(sampleSize.toDouble / dataDirLs.length.toDouble).toInt
+      sampleSize: Int): Future[Array[Key]] = Future {
+    var nowSampleSize = 0
 
-    val futures = for (dir <- dataDirLs)
-      yield Future {
-        Data.fromFile(dir).sampling(sampleSizePerFile)
+    var result = Array.empty[Key]
+
+    while (nowSampleSize < sampleSize) {
+      for (dir <- dataDirLs) {
+        val data = Data.fromFile(dir)
+        nowSampleSize += data.data.length
+        result ++= data.data.map(_.key)
       }
+    }
 
-    Future.sequence(futures).map(_.toArray.flatten)
+    result
   }
 
   def sortAndPartitioning(
