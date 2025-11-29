@@ -17,15 +17,15 @@ object DataProcessor {
       dataDirLs: List[String],
       sampleSize: Int): Future[Array[Key]] = Future {
     var nowSampleSize = 0
+    val dataDirIterator = dataDirLs.iterator
 
     var result = Array.empty[Key]
 
-    while (nowSampleSize < sampleSize) {
-      for (dir <- dataDirLs) {
-        val data = Data.fromFile(dir)
-        nowSampleSize += data.data.length
-        result ++= data.data.map(_.key)
-      }
+    while (nowSampleSize < sampleSize && dataDirIterator.hasNext) {
+      val dir = dataDirIterator.next()
+      val data = Data.fromFile(dir)
+      nowSampleSize += data.data.length
+      result ++= data.data.map(_.key)
     }
 
     result
