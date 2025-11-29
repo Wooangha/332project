@@ -17,7 +17,7 @@ import com.master.server.MasterServer.RegisterRequest
 import io.grpc.ManagedChannelBuilder
 import scala.collection.mutable.{Set => MutableSet}
 import scala.util.{Success, Failure}
-import com.worker.server.WorkerServer.WorkerSeverGrpc
+import com.worker.server.WorkerServer.WorkerServerGrpc
 import com.google.protobuf.empty.Empty
 import scala.concurrent.blocking
 
@@ -214,7 +214,7 @@ class MasterServerImpl(numOfWorkers: Int, onMasterCanShutdown: () => Unit) exten
                 case (ip, port) => {
                     Future{
                         val channel = ManagedChannelBuilder.forAddress(ip, port).usePlaintext().build()
-                        val stub = WorkerSeverGrpc.blockingStub(channel)
+                        val stub = WorkerServerGrpc.blockingStub(channel)
 
                         try {
                             blocking {
