@@ -321,13 +321,14 @@ object WorkerMain extends App {
                     try {
                         val stub = WorkerServerGrpc
                             .blockingStub(channel)
-                            .withDeadlineAfter(2, TimeUnit.MINUTES) // silent-hang 방지용인데, 시간 이거 좀 적절히 조절해야 할 듯?
                         
                         val req = com.worker.server.WorkerServer.Ip(ip = myIp)
-                        val it = stub.getPartitionData(req) // blocking iterator
+                        val timoutIt = new Util.TimeoutIterator(
+                            stub.getPartitionData(req),
+                            Duration(2, TimeUnit.MINUTES))
 
                         var savePaths = List[String]()
-                        for (partData <- it) {
+                        for (partData <- timoutIt) {
                             val tmpPath = makeTmpPath()
                             val outPath = Paths.get(tmpPath)
                             savePaths = tmpPath :: savePaths
