@@ -10,6 +10,7 @@ import com.google.protobuf.empty.Empty
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import io.grpc.stub.ServerCallStreamObserver
 
 class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
@@ -74,40 +75,47 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
             val dir = Paths.get(tempDir)
             var stream: DirectoryStream[java.nio.file.Path] = null
 
-            try {
-                // 1. ip-* 패턴에 매칭되는 모든 파일 모으기
-                stream = Files.newDirectoryStream(dir, s"$ip-*")
-                
-                // 2. 파일 이름 순서대로 정렬 (예: IP-0, IP-1, IP-2 순서 보장)
-                val filesToStream = stream.iterator().asScala.toList.sortBy(_.getFileName.toString) 
-                
-                if (filesToStream.isEmpty) {
-                    println(s"[WorkerServer] ERROR: no partition files for ip=$ip")
-                    responseObserver.onCompleted()
-                } else {
-                    println(s"[WorkerServer] streaming ${filesToStream.size} files for $ip")
+            val obs = responseObserver.asInstanceOf[ServerCallStreamObserver[PartitionData]]
+            obs.setOnReadyHandler(new Runnable {
+                override def run(): Unit = {
+                    try {
+                        // 1. ip-* 패턴에 매칭되는 모든 파일 모으기
+                        stream = Files.newDirectoryStream(dir, s"$ip-*")
+                        
+                        // 2. 파일 이름 순서대로 정렬 (예: IP-0, IP-1, IP-2 순서 보장)
+                        val filesToStream = stream.iterator().asScala.toList.sortBy(_.getFileName.toString) 
+                        
+                        if (filesToStream.isEmpty) {
+                            println(s"[WorkerServer] ERROR: no partition files for ip=$ip")
+                            obs.onCompleted()
+                        } else {
+                            println(s"[WorkerServer] streaming ${filesToStream.size} files for $ip")
 
-                    // 3. 찾은 모든 파일을 순서대로 열어서 하나의 스트림으로 전송 (Concatenation)
-                    filesToStream.foreach { path =>
-                        var in: InputStream = null
-                        try {
-                            in = Files.newInputStream(path)
-                            val buf = new Array[Byte](100000) // 100KB 버퍼
-                            var read = in.read(buf)
-                            while (read != -1) {
-                                val chunk = PartitionData(data = ByteString.copyFrom(buf, 0, read))
-                                responseObserver.onNext(chunk)
-                                read = in.read(buf)
+                            // 3. 찾은 모든 파일을 순서대로 열어서 하나의 스트림으로 전송 (Concatenation)
+                            filesToStream.foreach { path =>
+                                var in: InputStream = null
+                                try {
+                                    in = Files.newInputStream(path)
+                                    val buf = new Array[Byte](100000) // 100KB 버퍼
+                                    var read = in.read(buf)
+                                    while (read != -1) {
+                                        if (obs.isReady) {
+                                            val chunk = PartitionData(data = ByteString.copyFrom(buf, 0, read))
+                                            obs.onNext(chunk)
+                                            read = in.read(buf)
+                                        }
+                                    }
+                                } finally if (in != null) in.close()
                             }
-                        } finally if (in != null) in.close()
-                    }
 
-                    responseObserver.onCompleted()
-                    println(s"[WorkerServer] finished streaming for $ip")
+                            obs.onCompleted()
+                            println(s"[WorkerServer] finished streaming for $ip")
+                        }
+                    } finally {
+                        if (stream != null) stream.close()
+                    }
                 }
-            } finally {
-                if (stream != null) stream.close()
-            }
+            })
         }
     }
 }
