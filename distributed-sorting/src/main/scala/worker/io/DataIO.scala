@@ -104,4 +104,4 @@ class DatumFileWriter(val outputDir: String, val data: Seq[Datum]) extends FileW
   override val parser: Parser[Datum] = DatumParser
 }
 
-class DatumFileIterator(inputDir: String) extends FileIterator[Datum](inputDir, DatumParser, 10000)
+class DatumFileIterator(inputDir: String) extends FileIterator[Datum](inputDir, DatumParser, 100)
