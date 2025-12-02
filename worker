@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Usage:
+#   ./worker <master_ip:port> -I <input1> <input2> ... -O <outputdir>
+
+if [ $# -lt 4 ]; then
+  echo "Usage: $0 <master_ip:port> -I <input dirs...> -O <output dir>"
+  exit 1
+fi
+
+MASTER=$1
+shift 1
+
+INPUT_DIRS=()
+OUTPUT_DIR=""
+
+# Parse args (-I ... -O ...)
+MODE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -I)
+      MODE="INPUT"
+      shift 1
+      ;;
+    -O)
+      MODE="OUTPUT"
+      shift 1
+      ;;
+    *)
+      if [ "$MODE" == "INPUT" ]; then
+        INPUT_DIRS+=("$1")
+      elif [ "$MODE" == "OUTPUT" ]; then
+        OUTPUT_DIR="$1"
+      else
+        echo "Unknown argument: $1"
+        exit 1
+      fi
+      shift 1
+      ;;
+  esac
+done
+
+if [ ${#INPUT_DIRS[@]} -eq 0 ]; then
+  echo "Error: no input directories provided."
+  exit 1
+fi
+
+if [ -z "$OUTPUT_DIR" ]; then
+  echo "Error: output directory not provided."
+  exit 1
+fi
+
+# Build input list for sbt call
+I_ARGS="-I"
+for d in "${INPUT_DIRS[@]}"; do
+  I_ARGS="$I_ARGS $d"
+done
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+cd "${SCRIPT_DIR}/distributed-sorting"
+
+# Finally call WorkerMain
+sbt -J-Xmx16G -J-Xms10G \
+    -Dsbt.log.noformat=true \
+    --error --supershell=false \
+    "runMain WorkerMain ${MASTER} ${I_ARGS} -O ${OUTPUT_DIR}"
