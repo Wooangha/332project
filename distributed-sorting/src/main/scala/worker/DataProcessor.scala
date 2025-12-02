@@ -15,15 +15,24 @@ object DataProcessor {
 
   def sampling(
       dataDirLs: List[String],
-      sampleSize: Int): Future[Array[Key]] = {
-    val sampleSizePerFile = Math.ceil(sampleSize.toDouble / dataDirLs.length.toDouble).toInt
+      sampleSize: Int): Future[Array[Key]] = Future {
+    var nowSampleSize = 0
+    val dataDirIterator = dataDirLs.iterator
 
-    val futures = for (dir <- dataDirLs)
-      yield Future {
-        Data.fromFile(dir).sampling(sampleSizePerFile)
-      }
+    var result = Array.empty[Key]
 
-    Future.sequence(futures).map(_.toArray.flatten)
+    while (nowSampleSize < sampleSize && dataDirIterator.hasNext) {
+      val dir = dataDirIterator.next()
+      val data = Data.fromFile(dir)
+      
+      val dataSize = data.data.length
+      val takeSize = Math.min(sampleSize - nowSampleSize, dataSize)
+      nowSampleSize += takeSize
+
+      result ++= data.data.take(takeSize).map(_.key)
+    }
+
+    result
   }
 
   def sortAndPartitioning(
@@ -32,23 +41,14 @@ object DataProcessor {
 
     val dataLoadLs = for ((inputDir, numOfData) <- dataDirLs.zip(0 until dataDirLs.length))
       yield Future {
-        (numOfData, Data.fromFile(inputDir).sort().partitioning(partition))
-      }
-
-    val savedDataLoadLs = dataLoadLs.map { dataLoad =>
-      dataLoad.flatMap { case (numOfData, data) =>
-        val saveFutures = for ((ip, partData) <- data) yield Future {
+        Data.fromFile(inputDir).sort().partitioning(partition).map { case (ip, partData) =>
           val saveDir = s"${tempDirPrefix}${ip}-${numOfData.toString}"
           partData.save(saveDir)
           saveDir
         }
-        Future.sequence(saveFutures)
       }
-    }
 
-    Future.sequence(savedDataLoadLs).flatMap { dirsLis =>
-      Future.successful(dirsLis.flatten)
-    }
+    Future.sequence(dataLoadLs).map(_.flatten)
   }
 
   def removeTempDir(): Unit = {
