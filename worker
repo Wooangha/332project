@@ -62,7 +62,7 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 cd "${SCRIPT_DIR}/distributed-sorting"
 
 # Finally call WorkerMain
-sbt -J-Xmx16G \
+sbt -J-Xmx8G \
     -Dsbt.log.noformat=true \
     --error --supershell=false \
     "runMain WorkerMain ${MASTER} ${I_ARGS} -O ${OUTPUT_DIR}"
