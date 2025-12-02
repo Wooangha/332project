@@ -42,6 +42,13 @@ object WorkerMain extends App {
 
     val (inputDirs, outputDirs) = parseIOArgs(args.drop(1))
 
+    val inputFiles = inputDirs.flatMap { inputDir =>
+        Files.walk(Paths.get(inputDir)).iterator().asScala
+            .filter(p => Files.isRegularFile(p))
+            .map(_.toString)
+            .toList
+    }
+
     //출력 디렉토리 생성
     Files.createDirectories(Paths.get(outputDirs))
 
@@ -90,7 +97,7 @@ object WorkerMain extends App {
 
         // 비동기 처리 맞는지?
         val sampleKeysF: Future[Array[Key]] = DataProcessor
-            .sampling(inputDirs.toList, sampleSize)
+            .sampling(inputFiles.toList, sampleSize)
 
         val sampleKeys: Array[Key] = Await.result(sampleKeysF, Duration.Inf) // 코드 이렇게 써도 안전한가?
 
@@ -121,7 +128,7 @@ object WorkerMain extends App {
         println("[Worker] sort and partitioning local data start")
 
         val partitionedDirsF: Future[List[String]] = 
-            DataProcessor.sortAndPartitioning(inputDirs.toList, partitionFunc)
+            DataProcessor.sortAndPartitioning(inputFiles.toList, partitionFunc)
         
         val partitionedDirs: List[String] = Await.result(partitionedDirsF, Duration.Inf)
 
