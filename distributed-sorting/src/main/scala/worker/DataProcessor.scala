@@ -41,7 +41,9 @@ object DataProcessor {
 
     val dataLoadLs = for ((inputDir, numOfData) <- dataDirLs.zip(0 until dataDirLs.length))
       yield Future {
+        println(s"[DataProcessor] Loading data from $inputDir...")
         Data.fromFile(inputDir).sort().partitioning(partition).map { case (ip, partData) =>
+          println(s"[DataProcessor] Saving partition for $ip from $inputDir...")
           val saveDir = s"${tempDirPrefix}${ip}-${numOfData.toString}"
           partData.save(saveDir)
           saveDir

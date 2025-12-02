@@ -332,6 +332,7 @@ object WorkerMain extends App {
             blocking {
               for (partData <- it) {
                 val tmpPath = makeTmpPath()
+                println(s"[Worker] receiving partition data from $ip:$port and saving to $tmpPath")
                 val outPath = Paths.get(tmpPath)
                 savePaths = tmpPath :: savePaths
                 val out = java.nio.file.Files.newOutputStream(outPath)

@@ -91,12 +91,18 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
         blocking {
           filesToStream.foreach { path =>
             var in: InputStream = null
+            println(s"[WorkerServer] streaming file: ${path.toString} for $ip")
             try {
+                val fileSize = Files.size(path)
+                var nowSent: Long = 0
+                println(s"[WorkerServer] file size: $fileSize bytes")
                 in = Files.newInputStream(path)
                 val buf = new Array[Byte](100000) // 100KB 버퍼
                 var read = in.read(buf)
                 while (read != -1) {
                   val chunk = PartitionData(data = ByteString.copyFrom(buf, 0, read))
+                  nowSent += read
+                  println(s"[WorkerServer] sending chunk of size $read bytes (total sent: $nowSent/$fileSize) for $ip")
                   responseObserver.onNext(chunk)
                   read = in.read(buf)
                 }
