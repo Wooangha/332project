@@ -3,7 +3,7 @@ import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.jdk.CollectionConverters._
-import scala.concurrent.Future
+import scala.concurrent.{Future, blocking}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import io.grpc.stub.StreamObserver
@@ -88,20 +88,22 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
         // 3. 찾은 모든 파일을 순서대로 열어서 하나의 스트림으로 전송 (Concatenation)
 
-        filesToStream.foreach { path =>
-          var in: InputStream = null
-          try {
-              in = Files.newInputStream(path)
-              val buf = new Array[Byte](100000) // 100KB 버퍼
-              var read = in.read(buf)
-              while (read != -1) {
-                val chunk = PartitionData(data = ByteString.copyFrom(buf, 0, read))
-                responseObserver.onNext(chunk)
-                read = in.read(buf)
+        blocking {
+          filesToStream.foreach { path =>
+            var in: InputStream = null
+            try {
+                in = Files.newInputStream(path)
+                val buf = new Array[Byte](100000) // 100KB 버퍼
+                var read = in.read(buf)
+                while (read != -1) {
+                  val chunk = PartitionData(data = ByteString.copyFrom(buf, 0, read))
+                  responseObserver.onNext(chunk)
+                  read = in.read(buf)
+                }
+            } finally {
+              if (in != null) {
+                in.close()
               }
-          } finally {
-            if (in != null) {
-              in.close()
             }
           }
         }
