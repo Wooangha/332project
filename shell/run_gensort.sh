@@ -5,7 +5,9 @@
 # 예:
 #   ./run_gensort.sh 1000000 10 500 inputs
 
-GENSORT="/home/indigo/hj/332project/distributed-sorting/src/test/resources/gensort/64/gensort"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+
+GENSORT="${SCRIPT_DIR}/../distributed-sorting/src/test/resources/gensort/64/gensort"
 BASEDIR=$(pwd)
 
 if [ $# -ne 4 ]; then

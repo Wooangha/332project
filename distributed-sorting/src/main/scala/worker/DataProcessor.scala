@@ -37,18 +37,20 @@ object DataProcessor {
 
   def sortAndPartitioning(
       dataDirLs: List[String],
-      partition: Key => String): Future[List[String]] = {
+      partition: Key => String): Future[List[String]] = Future {
 
     val dataLoadLs = for ((inputDir, numOfData) <- dataDirLs.zip(0 until dataDirLs.length))
-      yield Future {
+      yield {
+        println(s"[DataProcessor] Loading data from $inputDir...")
         Data.fromFile(inputDir).sort().partitioning(partition).map { case (ip, partData) =>
+          println(s"[DataProcessor] Saving partition for $ip from $inputDir...")
           val saveDir = s"${tempDirPrefix}${ip}-${numOfData.toString}"
           partData.save(saveDir)
           saveDir
         }
       }
 
-    Future.sequence(dataLoadLs).map(_.flatten)
+    dataLoadLs.flatten
   }
 
   def removeTempDir(): Unit = {
