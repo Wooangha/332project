@@ -91,3 +91,5 @@ libraryDependencies ++= Seq(
     "io.grpc" % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
 )
+
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.18" % Test
