@@ -70,14 +70,23 @@ class MasterServerImpl(numOfWorkers: Int, onMasterCanShutdown: () => Unit) exten
             }
             
             if(!isShuffle){ // 처음 등록 용 register
+                if (MasterDashboard.verbose) {
+                    MasterDashboard.MasterManager.updateRegistering(ip, port)
+                    MasterDashboard.MasterManager.updateShutdown(ip, MasterDashboard.NOT_YET)
+                }
                 workerInfosMap += (ip -> port)
 
                 val newVersion = currentVersion.incrementAndGet()
 
                 //워커들 ip 한 번 출력
                 if (!workerIpsPrinted && workerInfosMap.size == numOfWorkers) {
-                    val ips = workerInfosMap.keys.toSeq.sorted.mkString(", ")
-                    println(ips)
+                    if (!MasterDashboard.verbose) {
+                        val ips = workerInfosMap.keys.toSeq.sorted.mkString(", ")
+                        println(ips)
+                    } else {
+                        MasterDashboard.MasterManager.updatePhase(MasterDashboard.SAMPLING)
+                    }
+
                     workerIpsPrinted = true
                 }
 
@@ -123,6 +132,9 @@ class MasterServerImpl(numOfWorkers: Int, onMasterCanShutdown: () => Unit) exten
             val keyBatch: Vector[Key] = request.keyData.map(k => Key(k.keyDatum.toByteArray())).toVector
 
             sampleKeyMap.update(ip, keyBatch)
+            if (MasterDashboard.verbose) {
+                MasterDashboard.MasterManager.updateSampling(ip)
+            }
 
             if (sampleKeyMap.size < numOfWorkers) {
                 val p = Promise[PartitionRanges]()
@@ -130,6 +142,10 @@ class MasterServerImpl(numOfWorkers: Int, onMasterCanShutdown: () => Unit) exten
                 promiseOpt = Some(p)
             }
             else { // 웨리포 완료 후 죽었다가 살아난 워커는 다시 compute 호출하므로 비효율적임 -> 나중에 optimization할 때가 오면 수정
+                if (MasterDashboard.verbose) {
+                    MasterDashboard.MasterManager.updatePhase(MasterDashboard.SHUTDOWN)
+                }
+            
                 val allKeys: Vector[Key] = sampleKeyMap.values.flatten.toVector
 
                 val ranges: Seq[PartitionRanges.PartitionRange] =
@@ -193,6 +209,9 @@ class MasterServerImpl(numOfWorkers: Int, onMasterCanShutdown: () => Unit) exten
         var promise: Promise[CanShutdownWorkerServerReply] = null
 
         lock.synchronized{
+            if (MasterDashboard.verbose) {
+                MasterDashboard.MasterManager.updateShutdown(callerIp, MasterDashboard.SHUTDOWN_RECEIVED)
+            }
             // 이번 canShutdown 시도에서 사용될 promise 준비
             if(globalCanshutdownPromise.isEmpty){
                 globalCanshutdownPromise = Some(Promise[CanShutdownWorkerServerReply]())
@@ -237,6 +256,15 @@ class MasterServerImpl(numOfWorkers: Int, onMasterCanShutdown: () => Unit) exten
 
                     if(allAliveAndAllDone) { // 모든 워커들 닫게 되면 마스터도 서버 닫는 신호 보내기
                         onMasterCanShutdown()
+
+                        if (MasterDashboard.verbose) {
+                            MasterDashboard.MasterManager.updatePhase(MasterDashboard.DONE)
+                        }
+                    } else {
+                        if (MasterDashboard.verbose) {
+                            for (callerIp <- workerSnapshot)
+                                MasterDashboard.MasterManager.updateShutdown(callerIp._1, MasterDashboard.SHUTDOWN_DELAYED)
+                        }
                     }
 
                     lock.synchronized{

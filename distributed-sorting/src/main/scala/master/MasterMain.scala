@@ -13,6 +13,8 @@ object MasterMain extends App {
 
     val NUM_OF_WORKER = args(0).toInt
 
+    MasterDashboard.verbose = args.contains("-v")
+
     //마스터 종료 기다리는 promise
     val masterShutdownPromise = Promise[Unit]()
 
@@ -39,6 +41,12 @@ object MasterMain extends App {
     val ip = getMyIp
 
     println(s"$ip:$port")
+    if (MasterDashboard.verbose) {
+        println("\n\n\n")
+        MasterDashboard.DashboardRenderer.start()
+        MasterDashboard.MasterManager.init(NUM_OF_WORKER)
+        MasterDashboard.MasterManager.updatePhase(MasterDashboard.REGISTERING)
+    }
 
     // MasterServerImpl에서 promise complete되면 서버 닫음
     masterShutdownPromise.future.foreach { _ =>
