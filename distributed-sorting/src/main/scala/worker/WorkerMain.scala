@@ -193,7 +193,6 @@ object WorkerMain extends App {
       val reply: CanShutdownWorkerServerReply = masterbloc.canShutdownWorkerServer(myIpMsg)
 
       if(reply.canShutdownWorkerServer) {
-        println("[Worker] master says I can shutdown. Exiting.")
         if (WorkerDashboard.verbose) {
           WorkerDashboard.setStatus(WorkerDashboard.Done)
         }
