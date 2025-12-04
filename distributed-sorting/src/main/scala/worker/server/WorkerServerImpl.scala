@@ -84,25 +84,28 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
         println(s"[WorkerServer] no partition files for ip=$ip")
         responseObserver.onCompleted()
       } else {
-        println(s"[WorkerServer] streaming ${filesToStream.size} files for $ip")
 
         // 3. 찾은 모든 파일을 순서대로 열어서 하나의 스트림으로 전송 (Concatenation)
+        if (worker.WorkerDashboard.verbose) {
+          worker.WorkerDashboard.WorkerManager.initSending(ip, filesToStream.length)
+        }
 
         blocking {
           filesToStream.foreach { path =>
             var in: InputStream = null
-            println(s"[WorkerServer] streaming file: ${path.toString} for $ip")
             try {
+                if (worker.WorkerDashboard.verbose) {
+                  worker.WorkerDashboard.WorkerManager.incSending(ip)
+                }
+
                 val fileSize = Files.size(path)
                 var nowSent: Long = 0
-                println(s"[WorkerServer] file size: $fileSize bytes")
                 in = Files.newInputStream(path)
                 val buf = new Array[Byte](100000) // 100KB 버퍼
                 var read = in.read(buf)
                 while (read != -1) {
                   val chunk = PartitionData(data = ByteString.copyFrom(buf, 0, read))
                   nowSent += read
-                  println(s"[WorkerServer] sending chunk of size $read bytes (total sent: $nowSent/$fileSize) for $ip")
                   responseObserver.onNext(chunk)
                   read = in.read(buf)
                 }
@@ -116,7 +119,6 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
 
         responseObserver.onCompleted()
-        println(s"[WorkerServer] finished streaming for $ip")
       }
     } finally {
       if (stream != null) stream.close()
