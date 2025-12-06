@@ -155,7 +155,7 @@ object MasterDashboard {
 
     raw"""
 ======================================================================
-| IP, Port: ${st.info._1}, ${st.info._2}
+| IP:Port: ${st.info._1}:${st.info._2}
 | Status: ${st.phase}
 |
 | $regLine
