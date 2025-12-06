@@ -44,7 +44,7 @@ object MasterMain extends App {
     if (MasterDashboard.verbose) {
         println("\n\n\n")
         MasterDashboard.DashboardRenderer.start()
-        MasterDashboard.MasterManager.init(NUM_OF_WORKER)
+        MasterDashboard.MasterManager.init(NUM_OF_WORKER, (ip, port))
         MasterDashboard.MasterManager.updatePhase(MasterDashboard.REGISTERING)
     }
 

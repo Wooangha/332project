@@ -31,6 +31,7 @@ object MasterDashboard {
     phase: MasterPhase = REGISTERING,
 
     total: Int = 0,  // init(total)로 설정
+    info: (String, Int) = ("", 0), // (IP, PORT) of last registered worker
 
     registered: Map[String, WorkerInfo] = Map.empty, // IP → WorkerInfo (unique)
     sampled: Set[String] = Set.empty,                // IP only (unique)
@@ -43,6 +44,9 @@ object MasterDashboard {
 
     def withTotal(n: Int): MasterState =
       copy(total = n)
+    
+    def withInfo(ip: String, port: Int): MasterState =
+      copy(info = (ip, port))
 
     // ========== REGISTERING ==========
     def addRegistering(w: WorkerInfo): MasterState =
@@ -70,8 +74,8 @@ object MasterDashboard {
     def getState: MasterState = state
 
     // 초기 worker count 설정
-    def init(totalWorkers: Int): Unit = synchronized {
-      state = state.withTotal(totalWorkers)
+    def init(totalWorkers: Int, info: (String, Int)): Unit = synchronized {
+      state = state.withTotal(totalWorkers).withInfo(info._1, info._2)
     }
 
     // REGISTERING 업데이트 (IP & PORT)
@@ -151,6 +155,7 @@ object MasterDashboard {
 
     raw"""
 ======================================================================
+| IP, Port: ${st.info._1}, ${st.info._2}
 | Status: ${st.phase}
 |
 | $regLine
@@ -218,7 +223,7 @@ object ExampleMaster {
 
     DashboardRenderer.start()
 
-    MasterManager.init(3)
+    MasterManager.init(3, ("0.0.0.0", 0))
     Thread.sleep(500)
 
     MasterManager.updateRegistering("1.1.1.1", 7777)
