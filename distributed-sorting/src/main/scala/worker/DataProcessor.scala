@@ -38,12 +38,16 @@ object DataProcessor {
   def sortAndPartitioning(
       dataDirLs: List[String],
       partition: Key => String): Future[List[String]] = Future {
-
+    
+    if (WorkerDashboard.verbose) {
+      WorkerDashboard.WorkerManager.initSortPartitioning(dataDirLs.length)
+    }
     val dataLoadLs = for ((inputDir, numOfData) <- dataDirLs.zip(0 until dataDirLs.length))
       yield {
-        println(s"[DataProcessor] Loading data from $inputDir...")
+        if (WorkerDashboard.verbose) {
+          WorkerDashboard.WorkerManager.incSortPartitioning()
+        }
         Data.fromFile(inputDir).sort().partitioning(partition).map { case (ip, partData) =>
-          println(s"[DataProcessor] Saving partition for $ip from $inputDir...")
           val saveDir = s"${tempDirPrefix}${ip}-${numOfData.toString}"
           partData.save(saveDir)
           saveDir
@@ -82,6 +86,10 @@ object DataProcessor {
         }
       }
 
+      if (WorkerDashboard.verbose) {
+        WorkerDashboard.WorkerManager.initMerging(1)
+      }
+
       while (pq.nonEmpty) {
         val (minDatum, fromIter) = pq.dequeue()
         savingData += minDatum
@@ -92,11 +100,13 @@ object DataProcessor {
         }
         if (size >= maxSize) {
           val saveDir = makeNewDir()
-          println(s"Writing ${savingData.size} data to $saveDir...")
           val savingDataSeq = savingData.toSeq
           val saveFuture = Future {
             new DatumFileWriter(saveDir, savingDataSeq).write()
-            println(s"Finished writing to $saveDir.")
+
+            if (WorkerDashboard.verbose) {
+              WorkerDashboard.WorkerManager.incMerging()
+            }
           }
           saveFutures = saveFuture :: saveFutures
           savingData.clear()

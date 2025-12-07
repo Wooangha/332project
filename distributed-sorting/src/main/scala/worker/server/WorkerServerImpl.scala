@@ -12,6 +12,7 @@ import com.worker.server.WorkerServer.WorkerServerGrpc.WorkerServer
 import com.worker.server.WorkerServer.{Ip, PartitionData, IsAliveReply}
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.ByteString
+import worker.WorkerDashboard
 
 class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
@@ -22,7 +23,6 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
   def markDone(): Unit = {
     isDone = true
-    println("[WorkerServer] 모든 작업 완료")
   }
 
   // IP → partition 요청 확인
@@ -49,14 +49,14 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
   /** partition 요청 RPC */
   override def getPartitionData(request: Ip,responseObserver: StreamObserver[PartitionData]): Unit = {
     val ip = request.ip
-    println(s"[WorkerServer] getPartitionData 요청 받음: from=$ip")
+    if (WorkerDashboard.verbose) {
+      WorkerDashboard.WorkerManager.initSending(ip, 0) // 파일 개수는 나중에 채워질 것
+    }
 
     lock.synchronized {
       if (isPartitionDone) {
-        println("[WorkerServer] Partition 끝! 즉시 전송")
         sendPartitionData(ip, responseObserver)
       } else {
-        println(s"[WorkerServer] Partition 미완료 → 대기 리스트로 저장: $ip")
         waitingRequestForGetPartitionData.put(ip, responseObserver)
       }
     }
@@ -64,7 +64,6 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
   /** 서버 생존 체크 */
   override def isAlive(request: Empty): Future[IsAliveReply] = {
-    println("[WorkerServer] isAlive called")
     val reply = IsAliveReply(isAlive = true, isDone = this.isDone)
     Future.successful(reply)
   }
@@ -81,28 +80,30 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
       val filesToStream = stream.iterator().asScala.toList.sortBy(_.getFileName.toString) 
       
       if (filesToStream.isEmpty) {
-        println(s"[WorkerServer] no partition files for ip=$ip")
         responseObserver.onCompleted()
       } else {
-        println(s"[WorkerServer] streaming ${filesToStream.size} files for $ip")
 
         // 3. 찾은 모든 파일을 순서대로 열어서 하나의 스트림으로 전송 (Concatenation)
+        if (worker.WorkerDashboard.verbose) {
+          worker.WorkerDashboard.WorkerManager.initSending(ip, filesToStream.length)
+        }
 
         blocking {
           filesToStream.foreach { path =>
             var in: InputStream = null
-            println(s"[WorkerServer] streaming file: ${path.toString} for $ip")
             try {
+                if (worker.WorkerDashboard.verbose) {
+                  worker.WorkerDashboard.WorkerManager.incSending(ip)
+                }
+
                 val fileSize = Files.size(path)
                 var nowSent: Long = 0
-                println(s"[WorkerServer] file size: $fileSize bytes")
                 in = Files.newInputStream(path)
                 val buf = new Array[Byte](100000) // 100KB 버퍼
                 var read = in.read(buf)
                 while (read != -1) {
                   val chunk = PartitionData(data = ByteString.copyFrom(buf, 0, read))
                   nowSent += read
-                  println(s"[WorkerServer] sending chunk of size $read bytes (total sent: $nowSent/$fileSize) for $ip")
                   responseObserver.onNext(chunk)
                   read = in.read(buf)
                 }
@@ -116,7 +117,6 @@ class WorkerServerImpl(tempDir: String) extends WorkerServer {
 
 
         responseObserver.onCompleted()
-        println(s"[WorkerServer] finished streaming for $ip")
       }
     } finally {
       if (stream != null) stream.close()
